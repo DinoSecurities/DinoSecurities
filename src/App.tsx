@@ -1,7 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
-
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -14,30 +12,25 @@ import Governance from "./pages/app/Governance.tsx";
 import Settlement from "./pages/app/Settlement.tsx";
 import Settings from "./pages/app/Settings.tsx";
 
-const queryClient = new QueryClient();
-
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/app" element={<AppLayout />}>
-            <Route index element={<Dashboard />} />
-            <Route path="portfolio" element={<Portfolio />} />
-            <Route path="marketplace" element={<Marketplace />} />
-            <Route path="marketplace/:mint" element={<SecurityDetail />} />
-            <Route path="governance" element={<Governance />} />
-            <Route path="settlement" element={<Settlement />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <TooltipProvider>
+    <Sonner />
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Index />} />
+        <Route path="/app" element={<AppLayout />}>
+          <Route index element={<Dashboard />} />
+          <Route path="portfolio" element={<Portfolio />} />
+          <Route path="marketplace" element={<Marketplace />} />
+          <Route path="marketplace/:mint" element={<SecurityDetail />} />
+          <Route path="governance" element={<Governance />} />
+          <Route path="settlement" element={<Settlement />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </BrowserRouter>
+  </TooltipProvider>
 );
 
 export default App;
