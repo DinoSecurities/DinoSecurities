@@ -1,8 +1,10 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <nav
@@ -37,13 +39,13 @@ const Navbar = () => {
         >
           Connect Wallet
         </a>
-        <a
-          href="#start"
-          className="hidden sm:block rounded-full bg-foreground px-5 py-1.5 text-sm font-semibold text-background transition-all hover:opacity-90"
+        <button
+          onClick={() => navigate("/app")}
+          className="hidden sm:block rounded-full bg-foreground px-5 py-1.5 text-sm font-semibold text-background transition-all hover:opacity-90 cursor-pointer"
           style={{ boxShadow: "0 0 15px rgba(255,255,255,0.1)" }}
         >
           Launch App
-        </a>
+        </button>
         <button
           className="md:hidden p-2 text-foreground"
           onClick={() => setMobileOpen(!mobileOpen)}
