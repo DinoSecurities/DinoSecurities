@@ -108,6 +108,7 @@ const HeroSection = () => {
           transition={{ duration: 1, delay: 0.5 }}
         >
           <button
+            onClick={() => navigate("/app")}
             className="inline-flex transition-all duration-300 text-sm text-foreground rounded-full py-3 px-6 relative gap-x-2 items-center backdrop-blur-xl font-medium tracking-wide"
             style={{
               background: "linear-gradient(135deg, rgba(255,255,255,0.25) 0%, rgba(255,255,255,0.1) 50%, rgba(255,255,255,0.05) 100%)",
