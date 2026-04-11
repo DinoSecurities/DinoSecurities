@@ -16,14 +16,14 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
-    alias: {
-      "@": path.resolve(rootPath, "./src"),
-      react: path.resolve(rootPath, "./node_modules/react/index.js"),
-      "react/jsx-runtime": path.resolve(rootPath, "./node_modules/react/jsx-runtime.js"),
-      "react/jsx-dev-runtime": path.resolve(rootPath, "./node_modules/react/jsx-dev-runtime.js"),
-      "react-dom": path.resolve(rootPath, "./node_modules/react-dom/index.js"),
-      "react-dom/client": path.resolve(rootPath, "./node_modules/react-dom/client.js"),
-    },
+    alias: [
+      { find: "@", replacement: path.resolve(rootPath, "./src") },
+      { find: /^react\/jsx-runtime$/, replacement: path.resolve(rootPath, "./node_modules/react/jsx-runtime.js") },
+      { find: /^react\/jsx-dev-runtime$/, replacement: path.resolve(rootPath, "./node_modules/react/jsx-dev-runtime.js") },
+      { find: /^react-dom\/client$/, replacement: path.resolve(rootPath, "./node_modules/react-dom/client.js") },
+      { find: /^react-dom$/, replacement: path.resolve(rootPath, "./node_modules/react-dom/index.js") },
+      { find: /^react$/, replacement: path.resolve(rootPath, "./node_modules/react/index.js") },
+    ],
     dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
   },
 }));
