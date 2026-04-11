@@ -4,6 +4,7 @@ import { Menu, X } from "lucide-react";
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const navigate = useNavigate();
 
   return (
     <nav
