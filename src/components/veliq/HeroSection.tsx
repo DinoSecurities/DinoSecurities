@@ -33,7 +33,7 @@ const HeroSection = () => {
       glow.style.height = "1200px";
       glow.style.top = `${baseTop}%`;
       glow.style.background =
-        "linear-gradient(to bottom, hsl(0 0% 1.2%) 0%, rgba(16,185,129,0.7) 10%, rgba(255,255,255,0.9) 15%, rgba(6,182,212,0.8) 25%, hsl(0 0% 1.2%) 45%)";
+        "linear-gradient(to bottom, hsl(0 0% 1.2%) 0%, rgba(139,92,246,0.7) 10%, rgba(255,255,255,0.9) 15%, rgba(99,102,241,0.8) 25%, hsl(0 0% 1.2%) 45%)";
       glow.style.filter = "blur(4px)";
 
       wrapper.appendChild(glow);
@@ -81,11 +81,12 @@ const HeroSection = () => {
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
         >
           <span className="font-medium text-transparent bg-clip-text bg-gradient-to-br from-foreground to-muted-foreground">
-            Cognition
+            Tokenized
           </span>
           <br className="hidden sm:block" />
-          <span className="text-foreground"> that </span>
-          <span className="text-foreground">Adapts.</span>
+          <span className="text-foreground"> Securities.</span>
+          <br />
+          <span className="text-muted-foreground">On Solana.</span>
         </motion.h1>
 
         <motion.p
@@ -94,8 +95,8 @@ const HeroSection = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.3 }}
         >
-          Design, deploy, and refine with neural networks that mold to your specific ecosystem,
-          naturally grasp intent, and elevate performance dynamically.
+          Issue, manage, trade, and govern legally enforceable security tokens with on-chain compliance,
+          atomic settlement, and full DeFi composability.
         </motion.p>
 
         <motion.div
@@ -113,12 +114,12 @@ const HeroSection = () => {
             }}
           >
             <CheckCheck size={18} />
-            Activate System
+            Launch App
           </button>
 
           <button className="inline-flex transition-all duration-300 text-sm text-muted-foreground rounded-full py-3 px-6 relative gap-x-2 items-center border border-border hover:text-foreground hover:border-foreground/30">
             <ArrowRight size={16} />
-            Explore Architecture
+            Read Documentation
           </button>
         </motion.div>
       </div>

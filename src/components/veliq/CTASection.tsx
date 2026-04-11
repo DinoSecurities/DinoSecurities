@@ -21,19 +21,19 @@ const CTASection = () => (
           <div className="h-px w-8 bg-border" />
           <span className="w-1.5 h-1.5 bg-primary shadow-[0_0_12px] shadow-primary" />
           <span className="text-[10px] font-medium text-muted-foreground tracking-[0.2em] uppercase">
-            Veliq Network / Deployment
+            DinoSecurities / Get Started
           </span>
           <span className="w-1.5 h-1.5 bg-primary shadow-[0_0_12px] shadow-primary" />
           <div className="h-px w-8 bg-border" />
         </div>
 
         <h2 className="text-4xl md:text-6xl lg:text-7xl text-foreground leading-[0.85] mb-6 font-light tracking-tight">
-          COMMAND <span className="text-muted-foreground">YOUR COMPUTE.</span>
+          BUILD THE <span className="text-muted-foreground">FUTURE.</span>
         </h2>
 
         <p className="text-sm md:text-base text-muted-foreground max-w-xl leading-relaxed mb-12">
-          Join the network of enterprise nodes leveraging zero-latency deterministic routing. Provision your cluster
-          instantly and scale without friction.
+          Join the next generation of capital markets infrastructure. Issue, trade, and govern tokenized securities
+          on Solana with institutional-grade compliance.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 w-full sm:w-auto">
@@ -41,7 +41,7 @@ const CTASection = () => (
             className="w-full sm:w-auto px-8 py-4 bg-foreground text-[10px] uppercase tracking-widest text-background font-semibold hover:opacity-90 transition-all duration-300 flex items-center justify-center gap-2"
             style={{ boxShadow: "0 0 20px rgba(255,255,255,0.1)" }}
           >
-            Initialize Node
+            Launch App
             <ArrowRight size={14} />
           </button>
           <button className="w-full sm:w-auto px-8 py-4 border border-border text-[10px] uppercase tracking-widest text-foreground font-semibold hover:bg-secondary hover:border-foreground/30 transition-all duration-300 backdrop-blur-sm flex items-center justify-center gap-2 group">

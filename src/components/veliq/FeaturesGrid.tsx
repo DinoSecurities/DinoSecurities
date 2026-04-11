@@ -1,21 +1,36 @@
 import { motion } from "framer-motion";
-import { Database, Layers, ShieldCheck } from "lucide-react";
+import { Landmark, Vote, Zap, ShieldCheck, Coins, Globe } from "lucide-react";
 
 const features = [
   {
-    icon: Database,
-    title: "Distributed Mesh",
-    desc: "Zero-point fault routing across multi-region nodes with sub-millisecond failover and automated state reconciliation.",
-  },
-  {
-    icon: Layers,
-    title: "Log Consolidation",
-    desc: "Consume scattered log artifacts into a strictly parsed, singular data structure. Reveal truth through raw metric convergence.",
-  },
-  {
     icon: ShieldCheck,
-    title: "Identity Engine",
-    desc: "Cryptographic identity verification at every compute boundary. Zero-knowledge proofs ensure absolute data sovereignty.",
+    title: "Transfer Hooks",
+    desc: "Compliance logic enforced at the token level via Solana Token-2022 transfer hooks. Every transfer is validated against KYC, jurisdiction, and regulation requirements.",
+  },
+  {
+    icon: Zap,
+    title: "Atomic DvP",
+    desc: "Delivery vs Payment in a single transaction. Securities and cash settle simultaneously — sub-second, under $0.01 cost, zero counterparty risk.",
+  },
+  {
+    icon: Vote,
+    title: "On-Chain Governance",
+    desc: "Token-weighted DAO voting for each security series via SPL Governance (Realms). Proposals, quorum, and timelocks enforced on-chain.",
+  },
+  {
+    icon: Coins,
+    title: "DeFi Composability",
+    desc: "Security tokens tradeable on Jupiter, lendable on Marginfi, listable on Tensor and Magic Eden. Full Solana DeFi ecosystem access.",
+  },
+  {
+    icon: Landmark,
+    title: "Institutional Grade",
+    desc: "KYC/AML integration, permanent delegate for regulatory clawback, multisig admin controls, and comprehensive audit trails.",
+  },
+  {
+    icon: Globe,
+    title: "Multi-Jurisdiction",
+    desc: "Support for Reg D, Reg S, Reg CF, and Reg A+ with per-jurisdiction transfer restriction enforcement baked into every token.",
   },
 ];
 
@@ -31,7 +46,7 @@ const FeaturesGrid = () => (
     {features.map((f, i) => (
       <motion.div
         key={f.title}
-        className={`relative p-10 ${i < 2 ? "border-b md:border-b-0 md:border-r" : ""} border-border group hover:bg-secondary/50 transition-colors duration-500`}
+        className={`relative p-10 ${i < 3 ? "border-b" : ""} ${i % 3 !== 2 ? "md:border-r" : ""} border-border group hover:bg-secondary/50 transition-colors duration-500`}
         {...fadeUp}
         transition={{ duration: 0.8, delay: i * 0.1 }}
       >

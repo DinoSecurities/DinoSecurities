@@ -4,30 +4,30 @@ import SectionWrapper from "./SectionWrapper";
 
 const testimonials = [
   {
-    quote: "The coherence protocol transformed our entire pipeline. We went from 340ms average to sub-millisecond in under a week.",
+    quote: "DinoSecurities eliminated our T+2 settlement delay entirely. Atomic DvP on Solana means we close deals in under a second.",
     name: "Elena Vasquez",
-    role: "VP Engineering, Nexus Labs",
+    role: "VP Capital Markets, Nexus Partners",
     stars: 5,
     variant: "dark" as const,
   },
   {
-    quote: "Deployment was seamless. The live feedback loops allowed us to stabilize our neural matrices in record time.",
+    quote: "On-chain compliance via transfer hooks means we don't need middleware for Reg D restrictions. It's enforced at the token layer.",
     name: "Marcus Chen",
-    role: "Systems Ops, Quantum Edge",
+    role: "Head of Compliance, Digital Asset Fund",
     stars: 5,
-    variant: "emerald" as const,
+    variant: "purple" as const,
   },
   {
-    quote: "Zero-fault tolerance isn't just a marketing term here. We ran automated stress algorithms for 72 hours straight.",
+    quote: "The Ricardian contract model gives our investors confidence. Every token is cryptographically linked to its legal document.",
     name: "Sarah Jenkins",
-    role: "Infrastructure Lead, Alt-Net",
+    role: "General Counsel, Blockchain Ventures",
     stars: 5,
     variant: "dark" as const,
   },
   {
-    quote: "We completely bypassed conventional rendering latency. The dynamic scaling adapts instantly to our workloads.",
+    quote: "We tokenized our entire fund on DinoSecurities. LP positions, NAV tracking, and redemption — all on-chain with Solana speed.",
     name: "David Park",
-    role: "CTO, Synthetix.ai",
+    role: "CTO, Meridian Capital",
     stars: 5,
     variant: "dark" as const,
   },
@@ -43,13 +43,12 @@ const fadeUp = {
 const TestimonialsSection = () => (
   <SectionWrapper>
     <div className="flex flex-col gap-10">
-      {/* Header */}
       <motion.div className="text-center mb-8" {...fadeUp}>
         <div className="flex items-center justify-center gap-4 mb-8">
           <div className="h-px w-8 bg-border" />
           <span className="w-1.5 h-1.5 bg-primary shadow-[0_0_12px] shadow-primary" />
           <span className="text-[10px] font-medium text-muted-foreground tracking-[0.2em] uppercase">
-            Veliq Network / Signals
+            DinoSecurities / Testimonials
           </span>
           <span className="w-1.5 h-1.5 bg-primary shadow-[0_0_12px] shadow-primary" />
           <div className="h-px w-8 bg-border" />
@@ -59,7 +58,6 @@ const TestimonialsSection = () => (
         </h2>
       </motion.div>
 
-      {/* Grid */}
       <div className="grid grid-cols-1 md:grid-cols-12 gap-0">
         {testimonials.map((t, i) => (
           <motion.div
@@ -67,7 +65,7 @@ const TestimonialsSection = () => (
             className={`${i === 0 ? "md:col-span-7" : i === 1 ? "md:col-span-5" : i === 2 ? "md:col-span-5" : "md:col-span-7"} ${
               i < 2 ? "border-b" : ""
             } ${i % 2 === 0 ? "md:border-r" : ""} border-border p-8 lg:p-12 flex flex-col ${
-              t.variant === "emerald"
+              t.variant === "purple"
                 ? "bg-gradient-to-b from-primary to-primary/90"
                 : i === 3
                 ? "bg-background"
@@ -88,14 +86,14 @@ const TestimonialsSection = () => (
                         key={s}
                         size={14}
                         fill="currentColor"
-                        className={t.variant === "emerald" ? "text-primary-foreground" : "text-primary"}
+                        className={t.variant === "purple" ? "text-primary-foreground" : "text-primary"}
                       />
                     ))}
                   </div>
                 </div>
                 <p
                   className={`text-lg md:text-xl leading-relaxed tracking-tight mb-10 ${
-                    t.variant === "emerald"
+                    t.variant === "purple"
                       ? "font-medium text-primary-foreground"
                       : i === 3
                       ? "font-light text-foreground"
@@ -106,15 +104,15 @@ const TestimonialsSection = () => (
                 </p>
               </div>
 
-              <div className={`flex items-center gap-4 pt-6 border-t ${t.variant === "emerald" ? "border-primary-foreground/20" : "border-border"} mt-auto`}>
+              <div className={`flex items-center gap-4 pt-6 border-t ${t.variant === "purple" ? "border-primary-foreground/20" : "border-border"} mt-auto`}>
                 <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-xs font-bold text-foreground">
                   {t.name.split(" ").map((n) => n[0]).join("")}
                 </div>
                 <div>
-                  <div className={`text-sm font-semibold ${t.variant === "emerald" ? "text-primary-foreground" : "text-foreground"}`}>
+                  <div className={`text-sm font-semibold ${t.variant === "purple" ? "text-primary-foreground" : "text-foreground"}`}>
                     {t.name}
                   </div>
-                  <div className={`text-[10px] uppercase tracking-widest mt-0.5 ${t.variant === "emerald" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
+                  <div className={`text-[10px] uppercase tracking-widest mt-0.5 ${t.variant === "purple" ? "text-primary-foreground/80" : "text-muted-foreground"}`}>
                     {t.role}
                   </div>
                 </div>

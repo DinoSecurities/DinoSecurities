@@ -1,10 +1,10 @@
-import { ArrowRight, Cpu } from "lucide-react";
+import { ArrowRight, Shield } from "lucide-react";
 import BeamLines from "./BeamLines";
 
 const footerLinks = {
-  Platform: ["Architecture", "Compute Nodes", "Benchmarks", "Pricing Tiers", "Ecosystem", "Security Protocol", "Core Research"],
-  Developers: ["API Reference", "Documentation", "System Status", "SLA & Terms"],
-  Network: ["X / Twitter", "GitHub", "Discord"],
+  Platform: ["Marketplace", "Portfolio", "Settlement", "Governance", "KYC", "Documentation"],
+  Developers: ["API Reference", "GitHub", "System Status", "Integration Guides"],
+  Network: ["X / Twitter", "Discord", "Telegram"],
 };
 
 const FooterSection = () => (
@@ -20,10 +20,10 @@ const FooterSection = () => (
       {/* Giant brand text */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 w-full text-center z-0 pointer-events-none select-none">
         <h1
-          className="text-[20vw] leading-[0.75] tracking-tighter font-light text-transparent bg-clip-text opacity-40"
-          style={{ backgroundImage: "linear-gradient(to bottom, rgba(16,185,129,0.4) 0%, rgba(16,185,129,0.01) 100%)" }}
+          className="text-[15vw] leading-[0.75] tracking-tighter font-light text-transparent bg-clip-text opacity-40"
+          style={{ backgroundImage: "linear-gradient(to bottom, rgba(139,92,246,0.4) 0%, rgba(139,92,246,0.01) 100%)" }}
         >
-          Veliq AI
+          DinoSecurities
         </h1>
       </div>
 
@@ -37,11 +37,11 @@ const FooterSection = () => (
           <div className="flex items-center gap-4 mb-6">
             <span className="w-1.5 h-1.5 bg-primary shadow-[0_0_12px] shadow-primary" />
             <span className="text-[10px] font-mono text-muted-foreground tracking-[0.2em] uppercase">
-              Comms / Sync
+              Updates / Subscribe
             </span>
           </div>
 
-          <h2 className="text-3xl font-light text-foreground mb-8 tracking-tight">Initialize updates</h2>
+          <h2 className="text-3xl font-light text-foreground mb-8 tracking-tight">Stay Updated</h2>
 
           <div className="flex flex-col gap-3">
             <div className="flex items-center bg-background border border-border p-1">
@@ -52,7 +52,7 @@ const FooterSection = () => (
               />
             </div>
             <button className="bg-foreground hover:opacity-90 text-background transition-colors duration-300 text-xs font-mono uppercase tracking-widest px-6 py-3.5 whitespace-nowrap font-semibold flex items-center justify-center gap-2 w-full">
-              Establish Link
+              Subscribe
               <ArrowRight size={14} />
             </button>
           </div>
@@ -78,15 +78,15 @@ const FooterSection = () => (
       {/* Bottom bar */}
       <div className="z-10 flex flex-col md:flex-row gap-6 w-full max-w-7xl border-t border-border mx-auto pt-8 relative items-center justify-between">
         <div className="flex items-center gap-4 text-[10px] font-mono tracking-widest uppercase">
-          <span className="text-foreground/60">© 2026, Veliq AI.</span>
+          <span className="text-foreground/60">© 2026, DinoSecurities.</span>
           <div className="w-1 h-1 bg-foreground/20" />
-          <span className="text-muted-foreground">Engineered by Core Research.</span>
+          <span className="text-muted-foreground">Built on Solana.</span>
         </div>
 
         <a href="#" className="flex items-center gap-3 text-[10px] font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors group">
-          Powered by Neural Engine
+          Powered by Token-2022
           <div className="w-6 h-6 border border-border flex items-center justify-center text-foreground/50 group-hover:border-primary/50 group-hover:text-primary transition-colors bg-secondary">
-            <Cpu size={12} />
+            <Shield size={12} />
           </div>
         </a>
       </div>
