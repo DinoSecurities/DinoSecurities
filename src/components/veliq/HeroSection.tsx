@@ -5,6 +5,7 @@ import { CheckCheck, ArrowRight } from "lucide-react";
 
 const HeroSection = () => {
   const bgRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const container = bgRef.current;
