@@ -1,33 +1,61 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { useWallet } from "@solana/wallet-adapter-react";
 import {
   DollarSign,
   Briefcase,
   Users,
+  TrendingUp,
   Activity,
   ArrowUpRight,
   ArrowDownRight,
   ExternalLink,
-  TrendingUp,
   Clock,
+  Wallet,
 } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import StatCard from "@/components/dashboard/StatCard";
+import { useMyKYCStatus } from "@/hooks/useHolderRecord";
+import { useProposals } from "@/hooks/useGovernance";
+import { useSettlementOrders } from "@/hooks/useSettlement";
+
+// Still using mock data for holdings/chart until real Token-2022 integration
 import {
   holdings,
   recentActivity,
-  proposals,
-  settlementOrders,
   portfolioChartData,
 } from "@/lib/mockData";
 
 const Dashboard = () => {
   const [chartPeriod, setChartPeriod] = useState<"1M" | "3M" | "6M" | "1Y" | "ALL">("1Y");
+  const { connected } = useWallet();
+
+  // Real hooks (with mock fallback internally)
+  const { data: kycStatus } = useMyKYCStatus();
+  const { data: allProposals } = useProposals();
+  const { data: settlementData } = useSettlementOrders();
+
+  const activeProposals = (allProposals ?? []).filter((p) => p.status === "active");
+  const pendingSettlements = (settlementData ?? []).filter((o) => o.status !== "completed");
 
   const totalValue = holdings.reduce((s, h) => s + h.value, 0);
   const totalPnl = holdings.reduce((s, h) => s + h.pnl, 0);
-  const activeProposals = proposals.filter((p) => p.status === "active");
-  const pendingSettlements = settlementOrders.filter((o) => o.status !== "completed");
+
+  if (!connected) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-6">
+        <div className="w-16 h-16 border border-border bg-secondary/60 flex items-center justify-center">
+          <Wallet size={28} className="text-muted-foreground" />
+        </div>
+        <div className="text-center">
+          <h2 className="text-lg font-semibold text-foreground mb-2">Connect Your Wallet</h2>
+          <p className="text-sm text-muted-foreground max-w-md">
+            Connect a Solana wallet to view your portfolio, trade securities, vote on proposals, and manage settlements.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-8">
@@ -237,6 +265,9 @@ const Dashboard = () => {
                 View All
               </Link>
             </div>
+            {activeProposals.length === 0 && (
+              <div className="p-8 text-center text-xs text-muted-foreground">No active proposals</div>
+            )}
             {activeProposals.map((p) => {
               const totalVotes = p.votesFor + p.votesAgainst;
               const forPercent = totalVotes > 0 ? (p.votesFor / totalVotes) * 100 : 0;
@@ -274,6 +305,9 @@ const Dashboard = () => {
                 View All
               </Link>
             </div>
+            {pendingSettlements.length === 0 && (
+              <div className="p-8 text-center text-xs text-muted-foreground">No pending settlements</div>
+            )}
             {pendingSettlements.slice(0, 3).map((o) => (
               <div key={o.id} className="p-4 border-b border-border/30 hover:bg-secondary/20 transition-colors">
                 <div className="flex items-center justify-between mb-1">
@@ -301,14 +335,38 @@ const Dashboard = () => {
       </div>
 
       {/* KYC Status Banner */}
-      <div className="border border-primary/30 bg-primary/5 p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className={`border p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 ${
+        kycStatus?.status === "verified"
+          ? "border-primary/30 bg-primary/5"
+          : kycStatus?.status === "pending"
+            ? "border-amber-500/30 bg-amber-500/5"
+            : "border-red-500/30 bg-red-500/5"
+      }`}>
         <div className="flex items-center gap-4">
-          <div className="w-10 h-10 border border-primary/40 bg-primary/10 flex items-center justify-center shrink-0">
-            <span className="text-primary text-lg">✓</span>
+          <div className={`w-10 h-10 border flex items-center justify-center shrink-0 ${
+            kycStatus?.status === "verified"
+              ? "border-primary/40 bg-primary/10"
+              : kycStatus?.status === "pending"
+                ? "border-amber-500/40 bg-amber-500/10"
+                : "border-red-500/40 bg-red-500/10"
+          }`}>
+            <span className={`text-lg ${
+              kycStatus?.status === "verified" ? "text-primary" :
+              kycStatus?.status === "pending" ? "text-amber-500" : "text-red-500"
+            }`}>
+              {kycStatus?.status === "verified" ? "✓" : kycStatus?.status === "pending" ? "⏳" : "✗"}
+            </span>
           </div>
           <div>
-            <div className="text-sm font-semibold text-foreground">Identity Verified</div>
-            <div className="text-xs text-muted-foreground mt-0.5">KYC status: Approved • Accredited Investor • Expires Dec 2026</div>
+            <div className="text-sm font-semibold text-foreground">
+              {kycStatus?.status === "verified" ? "Identity Verified" :
+               kycStatus?.status === "pending" ? "KYC Pending" : "KYC Required"}
+            </div>
+            <div className="text-xs text-muted-foreground mt-0.5">
+              KYC status: {kycStatus?.status ?? "unknown"}
+              {kycStatus?.isAccredited && " • Accredited Investor"}
+              {kycStatus?.expiresAt && ` • Expires ${new Date(kycStatus.expiresAt * 1000).toLocaleDateString("en-US", { month: "short", year: "numeric" })}`}
+            </div>
           </div>
         </div>
         <Link

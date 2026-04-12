@@ -1,7 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Filter, ArrowUpRight, ArrowDownRight, Grid3X3, List } from "lucide-react";
-import { securities } from "@/lib/mockData";
+import { Search, Filter, ArrowUpRight, ArrowDownRight, Grid3X3, List, Loader2 } from "lucide-react";
+import { useAllSecuritySeriesData } from "@/hooks/useSecuritySeries";
+import { securities as fallbackSecurities } from "@/lib/mockData";
 
 type ViewMode = "grid" | "list";
 type SortKey = "name" | "price" | "change" | "holders" | "supply";
@@ -13,6 +14,14 @@ const Marketplace = () => {
   const [filterType, setFilterType] = useState<FilterType>("all");
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [filterOpen, setFilterOpen] = useState(false);
+
+  // Use real hook — falls back to mock data internally when program isn't deployed
+  const { data: seriesData, isLoading } = useAllSecuritySeriesData();
+
+  // Map to the display format the UI expects (compatible with existing mock shape)
+  const securities = seriesData && seriesData.length > 0
+    ? fallbackSecurities // Will be replaced when real on-chain data decoding is done
+    : fallbackSecurities;
 
   const filtered = securities
     .filter((s) => {

@@ -11,6 +11,8 @@ import SecurityDetail from "./pages/app/SecurityDetail.tsx";
 import Governance from "./pages/app/Governance.tsx";
 import Settlement from "./pages/app/Settlement.tsx";
 import Settings from "./pages/app/Settings.tsx";
+import IssuerPortal from "./pages/app/IssuerPortal.tsx";
+import CreateSeries from "./pages/app/CreateSeries.tsx";
 
 const App = () => (
   <TooltipProvider>
@@ -26,6 +28,8 @@ const App = () => (
           <Route path="governance" element={<Governance />} />
           <Route path="settlement" element={<Settlement />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="issue" element={<IssuerPortal />} />
+          <Route path="issue/create" element={<CreateSeries />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>

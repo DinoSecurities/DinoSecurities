@@ -8,8 +8,9 @@ import {
   Settings,
   ChevronLeft,
   Shield,
-  ExternalLink,
+  FileStack,
 } from "lucide-react";
+import WalletStatus from "@/components/wallet/WalletStatus";
 
 const navItems = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -17,6 +18,7 @@ const navItems = [
   { to: "/app/marketplace", label: "Marketplace", icon: Store },
   { to: "/app/governance", label: "Governance", icon: Vote },
   { to: "/app/settlement", label: "Settlement", icon: ArrowLeftRight },
+  { to: "/app/issue", label: "Issuer Portal", icon: FileStack },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ];
 
@@ -75,18 +77,7 @@ const AppSidebar = ({ collapsed, onToggle }: Props) => {
 
       {/* Collapse + Wallet */}
       <div className="border-t border-border p-3 flex flex-col gap-2 shrink-0">
-        {!collapsed && (
-          <div className="px-3 py-3 bg-secondary/60 border border-border">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px] shadow-primary" />
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                Wallet
-              </span>
-            </div>
-            <div className="text-xs text-foreground font-mono truncate">7xKp...mN4q</div>
-            <div className="text-[10px] text-muted-foreground mt-1">Solana Mainnet</div>
-          </div>
-        )}
+        {!collapsed && <WalletStatus />}
         <button
           onClick={onToggle}
           className="flex items-center justify-center gap-2 px-3 py-2 text-muted-foreground hover:text-foreground transition-colors"

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
+import { useWallet } from "@solana/wallet-adapter-react";
 import {
   Menu,
   Bell,
@@ -12,7 +13,10 @@ import {
   ArrowLeftRight,
   Settings,
   Shield,
+  FileStack,
 } from "lucide-react";
+import WalletButton from "@/components/wallet/WalletButton";
+import NetworkBadge from "@/components/wallet/NetworkBadge";
 
 const mobileNav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -20,6 +24,7 @@ const mobileNav = [
   { to: "/app/marketplace", label: "Marketplace", icon: Store },
   { to: "/app/governance", label: "Governance", icon: Vote },
   { to: "/app/settlement", label: "Settlement", icon: ArrowLeftRight },
+  { to: "/app/issue", label: "Issuer Portal", icon: FileStack },
   { to: "/app/settings", label: "Settings", icon: Settings },
 ];
 
@@ -34,6 +39,7 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const location = useLocation();
+  const { connected } = useWallet();
 
   const notifications = [
     { id: 1, title: "Settlement Completed", desc: "DvP order #1847 settled successfully", time: "2m ago", unread: true },
@@ -66,10 +72,7 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
           <div className="hidden md:flex items-center gap-3">
             <h1 className="text-sm font-semibold text-foreground">{pageName}</h1>
             <div className="h-4 w-px bg-border" />
-            <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-medium">
-              Solana Mainnet
-            </span>
-            <div className="w-1.5 h-1.5 rounded-full bg-primary shadow-[0_0_6px] shadow-primary" />
+            <NetworkBadge />
           </div>
         </div>
 
@@ -145,10 +148,13 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
             )}
           </div>
 
-          {/* Wallet badge */}
-          <div className="hidden sm:flex items-center gap-2 bg-secondary border border-border px-3 py-1.5 ml-1">
-            <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_4px] shadow-primary" />
-            <span className="text-xs font-mono text-foreground">7xKp...mN4q</span>
+          {/* Wallet button — real Solana wallet connection */}
+          <div className="hidden sm:block ml-1">
+            {connected ? (
+              <WalletButton compact />
+            ) : (
+              <WalletButton />
+            )}
           </div>
         </div>
       </header>
@@ -189,13 +195,7 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
               })}
             </nav>
             <div className="border-t border-border p-4">
-              <div className="flex items-center gap-2 bg-secondary/60 border border-border px-3 py-3">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse shadow-[0_0_6px] shadow-primary" />
-                <div>
-                  <div className="text-xs text-foreground font-mono">7xKp...mN4q</div>
-                  <div className="text-[10px] text-muted-foreground">Solana Mainnet</div>
-                </div>
-              </div>
+              <WalletButton />
             </div>
           </div>
         </>
