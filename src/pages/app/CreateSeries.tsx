@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
@@ -29,6 +29,7 @@ const CreateSeries = () => {
   const navigate = useNavigate();
   const { connected } = useWallet();
   const createSeries = useCreateSecuritySeries();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(1);
   const [formData, setFormData] = useState({
@@ -132,17 +133,23 @@ const CreateSeries = () => {
               <h3 className="text-sm font-semibold text-foreground mb-1">Upload Legal Document</h3>
               <p className="text-xs text-muted-foreground">Upload your Operating Agreement or Prospectus. It will be stored permanently on Arweave.</p>
             </div>
-            <div className="border-2 border-dashed border-border p-12 flex flex-col items-center gap-4 hover:border-primary/40 transition-colors cursor-pointer">
+            <div
+              onClick={() => fileInputRef.current?.click()}
+              className="border-2 border-dashed border-border p-12 flex flex-col items-center gap-4 hover:border-primary/40 transition-colors cursor-pointer"
+            >
               <Upload size={32} className="text-muted-foreground" />
               <div className="text-center">
                 <p className="text-sm text-foreground font-medium">Drop your PDF here or click to browse</p>
                 <p className="text-xs text-muted-foreground mt-1">PDF, max 50MB</p>
               </div>
               <input
+                ref={fileInputRef}
                 type="file"
                 accept=".pdf"
                 className="hidden"
-                onChange={(e) => updateField("legalDocFile", e.target.files?.[0] ?? null)}
+                onChange={(e) => {
+                  updateField("legalDocFile", e.target.files?.[0] ?? null);
+                }}
               />
               {formData.legalDocFile && (
                 <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 border border-primary/30">
