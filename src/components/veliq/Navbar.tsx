@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Menu, X } from "lucide-react";
-import { openWalletModal } from "@/components/wallet/walletModalState";
 
 const Navbar = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -35,12 +34,6 @@ const Navbar = () => {
 
       <div className="flex items-center gap-2 pr-1">
         <button
-          onClick={openWalletModal}
-          className="hidden sm:block rounded-full px-4 py-1.5 text-sm font-medium text-muted-foreground transition-colors duration-300 hover:text-foreground hover:bg-foreground/5 cursor-pointer"
-        >
-          Connect Wallet
-        </button>
-        <button
           onClick={() => navigate("/app")}
           className="hidden sm:block rounded-full bg-foreground px-5 py-1.5 text-sm font-semibold text-background transition-all hover:opacity-90 cursor-pointer"
           style={{ boxShadow: "0 0 15px rgba(255,255,255,0.1)" }}
@@ -68,8 +61,7 @@ const Navbar = () => {
             </a>
           ))}
           <div className="flex gap-2 mt-2 pt-2 border-t border-border">
-            <button onClick={() => { openWalletModal(); setMobileOpen(false); }} className="flex-1 text-center py-2 text-sm text-muted-foreground cursor-pointer">Connect Wallet</button>
-            <a href="#start" className="flex-1 text-center py-2 text-sm font-semibold bg-foreground text-background rounded-full">Launch App</a>
+            <a href="/app" className="flex-1 text-center py-2 text-sm font-semibold bg-foreground text-background rounded-full">Launch App</a>
           </div>
         </div>
       )}
