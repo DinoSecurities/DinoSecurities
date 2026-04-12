@@ -1,8 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { LogOut, Copy, Check, ExternalLink, Wallet } from "lucide-react";
+import { openWalletModal } from "./walletModalState";
 
 interface WalletButtonProps {
   compact?: boolean;
@@ -10,7 +10,6 @@ interface WalletButtonProps {
 
 export default function WalletButton({ compact = false }: WalletButtonProps) {
   const { publicKey, connected, disconnect, wallet } = useWallet();
-  const { setVisible } = useWalletModal();
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -85,10 +84,9 @@ export default function WalletButton({ compact = false }: WalletButtonProps) {
     );
   }
 
-  // Not connected — show connect button that opens our custom modal
   return (
     <button
-      onClick={() => setVisible(true)}
+      onClick={openWalletModal}
       className="flex items-center gap-2 bg-secondary border border-border px-3 hover:bg-secondary/80 transition-colors"
       style={{ height: "34px", fontSize: "12px", fontFamily: "monospace" }}
     >

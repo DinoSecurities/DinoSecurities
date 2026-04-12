@@ -3,14 +3,11 @@ import {
   ConnectionProvider,
   WalletProvider,
 } from "@solana/wallet-adapter-react";
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
-
-import "@solana/wallet-adapter-react-ui/styles.css";
 
 const NETWORK = import.meta.env.VITE_SOLANA_NETWORK || "devnet";
 const RPC_URL = import.meta.env.VITE_SOLANA_RPC_URL || clusterApiUrl("devnet");
@@ -33,7 +30,7 @@ export default function SolanaProvider({ children }: SolanaProviderProps) {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+        {children}
       </WalletProvider>
     </ConnectionProvider>
   );
