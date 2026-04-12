@@ -105,7 +105,7 @@ const FooterSection = () => (
         </div>
 
         <a href="#" className="flex items-center gap-3 text-[10px] font-mono tracking-widest uppercase text-muted-foreground hover:text-foreground transition-colors group">
-          Powered by Token-2022
+          Powered by Solana
           <div className="w-6 h-6 border border-border flex items-center justify-center text-foreground/50 group-hover:border-primary/50 group-hover:text-primary transition-colors bg-secondary">
             <Shield size={12} />
           </div>
