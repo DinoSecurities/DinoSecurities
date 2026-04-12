@@ -13,10 +13,12 @@ import Settlement from "./pages/app/Settlement.tsx";
 import Settings from "./pages/app/Settings.tsx";
 import IssuerPortal from "./pages/app/IssuerPortal.tsx";
 import CreateSeries from "./pages/app/CreateSeries.tsx";
+import WalletModal from "./components/wallet/WalletModal.tsx";
 
 const App = () => (
   <TooltipProvider>
     <Sonner />
+    <WalletModal />
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />
