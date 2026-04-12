@@ -1,0 +1,20 @@
+import { router } from "../trpc.js";
+import { securitiesRouter } from "./securities.js";
+import { holdersRouter } from "./holders.js";
+import { settlementsRouter } from "./settlements.js";
+import { kycRouter } from "./kyc.js";
+import { governanceRouter } from "./governance.js";
+import { documentsRouter } from "./documents.js";
+import { analyticsRouter } from "./analytics.js";
+
+export const appRouter = router({
+  securities: securitiesRouter,
+  holders: holdersRouter,
+  settlements: settlementsRouter,
+  kyc: kycRouter,
+  governance: governanceRouter,
+  documents: documentsRouter,
+  analytics: analyticsRouter,
+});
+
+export type AppRouter = typeof appRouter;
