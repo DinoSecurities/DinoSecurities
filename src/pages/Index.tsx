@@ -19,16 +19,16 @@ const Index = () => (
     <FramingLines />
     <main className="z-10 flex flex-col w-full relative items-center">
       <HeroSection />
-      <AboutSection />
-      <PlatformSection />
-      <HowItWorksSection />
-      <SecurityTypesSection />
-      <FeaturesGrid />
-      <ComparisonSection />
-      <TestimonialsSection />
-      <RoadmapSection />
-      <PricingSection />
-      <CTASection />
+      <div id="about"><AboutSection /></div>
+      <div id="platform"><PlatformSection /></div>
+      <div id="how-it-works"><HowItWorksSection /></div>
+      <div id="securities"><SecurityTypesSection /></div>
+      <div id="features"><FeaturesGrid /></div>
+      <div id="comparison"><ComparisonSection /></div>
+      <div id="testimonials"><TestimonialsSection /></div>
+      <div id="roadmap"><RoadmapSection /></div>
+      <div id="pricing"><PricingSection /></div>
+      <div id="docs"><CTASection /></div>
     </main>
     <FooterSection />
   </>

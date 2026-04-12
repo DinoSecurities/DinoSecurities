@@ -2,9 +2,25 @@ import { ArrowRight, Shield } from "lucide-react";
 import BeamLines from "./BeamLines";
 
 const footerLinks = {
-  Platform: ["Marketplace", "Portfolio", "Settlement", "Governance", "KYC", "Documentation"],
-  Developers: ["API Reference", "GitHub", "System Status", "Integration Guides"],
-  Network: ["X / Twitter", "Discord", "Telegram"],
+  Platform: [
+    { label: "Marketplace", href: "/app/marketplace" },
+    { label: "Portfolio", href: "/app/portfolio" },
+    { label: "Settlement", href: "/app/settlement" },
+    { label: "Governance", href: "/app/governance" },
+    { label: "KYC", href: "/app/settings" },
+    { label: "Documentation", href: "/#docs" },
+  ],
+  Company: [
+    { label: "About", href: "/#about" },
+    { label: "How It Works", href: "/#how-it-works" },
+    { label: "Security Types", href: "/#securities" },
+    { label: "Roadmap", href: "/#roadmap" },
+    { label: "Pricing", href: "/#pricing" },
+  ],
+  Network: [
+    { label: "X / Twitter", href: "https://x.com/SecuritiesDino", external: true },
+    { label: "Telegram", href: "#", external: true },
+  ],
 };
 
 const FooterSection = () => (
@@ -66,8 +82,13 @@ const FooterSection = () => (
                 {category}
               </span>
               {links.map((link) => (
-                <a key={link} href="#" className="text-sm text-muted-foreground hover:text-primary transition-colors whitespace-nowrap">
-                  {link}
+                <a
+                  key={link.label}
+                  href={link.href}
+                  {...(link.external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                  className="text-sm text-muted-foreground hover:text-primary transition-colors whitespace-nowrap"
+                >
+                  {link.label}
                 </a>
               ))}
             </div>
