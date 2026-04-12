@@ -210,6 +210,11 @@ export function useDinoCoreProgram(): Program | null {
 
   return useMemo(() => {
     if (!provider) return null;
-    return new Program(DINO_CORE_IDL, PROGRAM_IDS.DINO_CORE, provider);
+    try {
+      return new Program(DINO_CORE_IDL, PROGRAM_IDS.DINO_CORE, provider);
+    } catch {
+      // Program construction fails if IDL or program ID is invalid (placeholder)
+      return null;
+    }
   }, [provider]);
 }

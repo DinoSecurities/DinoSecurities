@@ -20,28 +20,45 @@ export const PDA_SEEDS = {
 } as const;
 
 /**
- * Program IDs — loaded from env, fallback to placeholder
+ * Program IDs — lazy-initialized to avoid PublicKey construction before Buffer polyfill
  */
-export const PROGRAM_IDS = {
-  DINO_CORE: new PublicKey(
-    import.meta.env.VITE_DINO_CORE_PROGRAM_ID ||
-      "11111111111111111111111111111111",
-  ),
-  DINO_HOOK: new PublicKey(
-    import.meta.env.VITE_DINO_HOOK_PROGRAM_ID ||
-      "11111111111111111111111111111111",
-  ),
-  DINO_GOV: new PublicKey(
-    import.meta.env.VITE_DINO_GOV_PROGRAM_ID ||
-      "11111111111111111111111111111111",
-  ),
-  SPL_GOVERNANCE: new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"),
-  TOKEN_2022: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
-  USDC_MINT: new PublicKey(
-    import.meta.env.VITE_USDC_MINT ||
-      "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-  ),
-} as const;
+let _programIds: {
+  DINO_CORE: PublicKey;
+  DINO_HOOK: PublicKey;
+  DINO_GOV: PublicKey;
+  SPL_GOVERNANCE: PublicKey;
+  TOKEN_2022: PublicKey;
+  USDC_MINT: PublicKey;
+} | null = null;
+
+export function getProgramIds() {
+  if (!_programIds) {
+    _programIds = {
+      DINO_CORE: new PublicKey(
+        import.meta.env.VITE_DINO_CORE_PROGRAM_ID || "11111111111111111111111111111111",
+      ),
+      DINO_HOOK: new PublicKey(
+        import.meta.env.VITE_DINO_HOOK_PROGRAM_ID || "11111111111111111111111111111111",
+      ),
+      DINO_GOV: new PublicKey(
+        import.meta.env.VITE_DINO_GOV_PROGRAM_ID || "11111111111111111111111111111111",
+      ),
+      SPL_GOVERNANCE: new PublicKey("GovER5Lthms3bLBqWub97yVrMmEogzX7xNjdXpPPCVZw"),
+      TOKEN_2022: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
+      USDC_MINT: new PublicKey(
+        import.meta.env.VITE_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      ),
+    };
+  }
+  return _programIds;
+}
+
+// Backward-compatible export — lazily evaluated on first property access
+export const PROGRAM_IDS = new Proxy({} as ReturnType<typeof getProgramIds>, {
+  get(_, prop: string) {
+    return getProgramIds()[prop as keyof ReturnType<typeof getProgramIds>];
+  },
+});
 
 /**
  * Derive a PDA for IssuerProfile

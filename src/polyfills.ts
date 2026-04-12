@@ -1,6 +1,4 @@
 import { Buffer } from "buffer";
 
-// Solana web3.js and related libraries need Buffer in the browser
-if (typeof globalThis.Buffer === "undefined") {
-  globalThis.Buffer = Buffer;
-}
+// Solana web3.js and related libraries need Buffer and global in the browser
+globalThis.Buffer = Buffer;

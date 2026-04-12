@@ -14,6 +14,9 @@ export default defineConfig(({ mode }) => ({
       overlay: false,
     },
   },
+  define: {
+    global: "globalThis",
+  },
   plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
   resolve: {
     alias: [
@@ -24,6 +27,15 @@ export default defineConfig(({ mode }) => ({
       { find: /^react-dom$/, replacement: path.resolve(rootPath, "./node_modules/react-dom/index.js") },
       { find: /^react$/, replacement: path.resolve(rootPath, "./node_modules/react/index.js") },
     ],
-    dedupe: ["react", "react-dom", "react/jsx-runtime", "react/jsx-dev-runtime"],
+    dedupe: [
+      "react",
+      "react-dom",
+      "react/jsx-runtime",
+      "react/jsx-dev-runtime",
+      "@solana/web3.js",
+      "@coral-xyz/anchor",
+      "bn.js",
+      "buffer",
+    ],
   },
 }));
