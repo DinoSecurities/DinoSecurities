@@ -7,8 +7,6 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import {
   PhantomWalletAdapter,
   SolflareWalletAdapter,
-  LedgerWalletAdapter,
-  CoinbaseWalletAdapter,
 } from "@solana/wallet-adapter-wallets";
 import { clusterApiUrl } from "@solana/web3.js";
 
@@ -28,8 +26,6 @@ export default function SolanaProvider({ children }: SolanaProviderProps) {
     () => [
       new PhantomWalletAdapter(),
       new SolflareWalletAdapter(),
-      new LedgerWalletAdapter(),
-      new CoinbaseWalletAdapter(),
     ],
     [],
   );
