@@ -1,11 +1,39 @@
 import { useState } from "react";
-import { Shield, User, Bell, Moon, Globe, Key, Check } from "lucide-react";
+import { Shield, User, Bell, Globe, Key, ExternalLink, Loader2 } from "lucide-react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { trpc } from "@/lib/trpc";
+import { truncateAddress } from "@/lib/solana";
+import { toast } from "sonner";
 
 const Settings = () => {
+  const { publicKey, connected } = useWallet();
+  const wallet = publicKey?.toBase58();
   const [activeTab, setActiveTab] = useState<"profile" | "security" | "notifications" | "preferences">("profile");
   const [saved, setSaved] = useState(false);
-  const [profile, setProfile] = useState({ displayName: "DinoUser", email: "user@dinosecurities.io" });
+  const [profile, setProfile] = useState({ displayName: "DinoUser", email: "" });
   const [notifications, setNotifications] = useState({ settlements: true, governance: true, transfers: true, marketing: false });
+
+  const kycStatus = useQuery({
+    queryKey: ["kycStatus", wallet],
+    queryFn: () => trpc.kyc.getStatusForWallet.query({ wallet: wallet! }),
+    enabled: !!wallet,
+    refetchInterval: 10_000,
+  });
+
+  const startKyc = useMutation({
+    mutationFn: () => trpc.kyc.initSession.mutate({ wallet: wallet! }),
+    onSuccess: (data) => {
+      if (data.redirectUrl) {
+        toast.success("Opening Didit verification…");
+        window.open(data.redirectUrl, "_blank", "noopener,noreferrer");
+      } else {
+        toast.error("KYC provider did not return a redirect URL");
+      }
+      kycStatus.refetch();
+    },
+    onError: (err: Error) => toast.error(err.message ?? "Failed to start KYC"),
+  });
 
   const handleSave = () => {
     setSaved(true);
@@ -47,12 +75,40 @@ const Settings = () => {
               <Shield size={18} className="text-primary" />
               <span className="text-[10px] uppercase tracking-widest text-foreground font-semibold">KYC Status</span>
             </div>
-            <div className="flex flex-col gap-2 text-xs">
-              <div className="flex justify-between"><span className="text-muted-foreground">Status</span><span className="text-emerald-400 font-semibold">Verified</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Level</span><span className="text-foreground">Accredited</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Expires</span><span className="text-foreground">Dec 2026</span></div>
-              <div className="flex justify-between"><span className="text-muted-foreground">Provider</span><span className="text-foreground">Persona</span></div>
-            </div>
+            {!connected ? (
+              <p className="text-xs text-muted-foreground">Connect a wallet to start verification.</p>
+            ) : (
+              <>
+                <div className="flex flex-col gap-2 text-xs">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Status</span>
+                    <span className={
+                      kycStatus.data?.status === "verified" ? "text-emerald-400 font-semibold" :
+                      kycStatus.data?.status === "pending" ? "text-amber-400 font-semibold" :
+                      kycStatus.data?.status === "rejected" || kycStatus.data?.status === "revoked" ? "text-red-400 font-semibold" :
+                      "text-muted-foreground"
+                    }>
+                      {kycStatus.isLoading ? "…" : (kycStatus.data?.status ?? "none")}
+                    </span>
+                  </div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Wallet</span><span className="text-foreground font-mono">{truncateAddress(wallet ?? "")}</span></div>
+                  <div className="flex justify-between"><span className="text-muted-foreground">Provider</span><span className="text-foreground">Didit</span></div>
+                </div>
+                {(kycStatus.data?.status === "none" || !kycStatus.data) && (
+                  <button
+                    onClick={() => startKyc.mutate()}
+                    disabled={startKyc.isPending || !wallet}
+                    className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-xs uppercase tracking-widest font-semibold disabled:opacity-50 hover:bg-primary/90 transition-colors"
+                  >
+                    {startKyc.isPending ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                    Start verification
+                  </button>
+                )}
+                {kycStatus.data?.status === "pending" && (
+                  <p className="text-[10px] text-muted-foreground mt-3">Verification in progress — refresh after completing in Didit.</p>
+                )}
+              </>
+            )}
           </div>
         </div>
 
@@ -62,10 +118,12 @@ const Settings = () => {
             <div className="p-6 flex flex-col gap-6">
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Profile Information</span>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-primary/20 border border-primary/40 flex items-center justify-center text-xl font-bold text-primary">DU</div>
+                <div className="w-16 h-16 bg-primary/20 border border-primary/40 flex items-center justify-center text-xl font-bold text-primary">
+                  {(profile.displayName?.[0] ?? "D").toUpperCase()}
+                </div>
                 <div>
-                  <div className="text-sm font-semibold text-foreground">DinoUser</div>
-                  <div className="text-xs text-muted-foreground font-mono">7xKp...mN4q</div>
+                  <div className="text-sm font-semibold text-foreground">{profile.displayName || "Anonymous"}</div>
+                  <div className="text-xs text-muted-foreground font-mono">{wallet ? truncateAddress(wallet) : "Not connected"}</div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

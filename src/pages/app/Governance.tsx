@@ -1,5 +1,16 @@
 import { useState } from "react";
-import { proposals } from "@/lib/mockData";
+import { Vote } from "lucide-react";
+
+// On-chain proposal listing requires aggregating Proposal PDAs across every
+// Realm (one per security mint). Wired as a stub until at least one Realm
+// exists on devnet — once it does, swap this for a real `useProposals()`
+// hook calling getProgramAccounts on dino_governance with the proposal
+// discriminator filter.
+const proposals: Array<{
+  id: string; title: string; description: string; status: "active" | "passed" | "rejected" | "pending";
+  series: string; proposer: string; endDate: string;
+  votesFor: number; votesAgainst: number; quorum: number;
+}> = [];
 
 const Governance = () => {
   const [filterStatus, setFilterStatus] = useState<"all" | "active" | "passed" | "rejected" | "pending">("all");
@@ -80,7 +91,13 @@ const Governance = () => {
             );
           })}
           {filtered.length === 0 && (
-            <div className="p-8 text-center text-sm text-muted-foreground">No proposals found</div>
+            <div className="p-12 flex flex-col items-center text-center gap-2">
+              <Vote size={32} className="text-muted-foreground" />
+              <div className="text-sm font-medium text-foreground">No proposals yet</div>
+              <p className="text-xs text-muted-foreground max-w-sm">
+                Proposals appear here once an issuer creates a governance Realm for their security and submits the first vote.
+              </p>
+            </div>
           )}
         </div>
 

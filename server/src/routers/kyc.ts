@@ -1,31 +1,49 @@
 import { z } from "zod";
 import { eq, desc } from "drizzle-orm";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, publicProcedure, protectedProcedure } from "../trpc.js";
 import { kycSessions } from "../db/schema.js";
+import { getKYCProvider } from "../services/kyc-oracle.js";
 
 export const kycRouter = router({
-  initSession: protectedProcedure.mutation(async ({ ctx }) => {
-    // Create a KYC session record — the actual provider integration
-    // (Jumio/Persona) will be wired up by the KYC oracle service
-    const [session] = await ctx.db
-      .insert(kycSessions)
-      .values({
-        wallet: ctx.walletAddress,
-        status: "pending",
-      })
-      .returning();
+  initSession: publicProcedure
+    .input(z.object({ wallet: z.string().min(32).max(44) }))
+    .mutation(async ({ ctx, input }) => {
+      const provider = getKYCProvider();
+      const { sessionId: providerSessionId, redirectUrl } = await provider.createSession(
+        input.wallet,
+      );
 
-    // TODO: Call KYC provider to create verification session
-    // const provider = getKYCProvider();
-    // const { sessionId, redirectUrl } = await provider.createSession(ctx.walletAddress);
-    // Update session with providerSessionId
+      const [session] = await ctx.db
+        .insert(kycSessions)
+        .values({
+          wallet: input.wallet,
+          status: "pending",
+          providerSessionId,
+        })
+        .returning();
 
-    return {
-      sessionId: session.id,
-      // redirectUrl will come from KYC provider
-      redirectUrl: null as string | null,
-    };
-  }),
+      return {
+        sessionId: session.id,
+        providerSessionId,
+        redirectUrl,
+      };
+    }),
+
+  getStatusForWallet: publicProcedure
+    .input(z.object({ wallet: z.string().min(32).max(44) }))
+    .query(async ({ ctx, input }) => {
+      const [latest] = await ctx.db
+        .select()
+        .from(kycSessions)
+        .where(eq(kycSessions.wallet, input.wallet))
+        .orderBy(desc(kycSessions.createdAt))
+        .limit(1);
+      if (!latest) return { status: "none" as const, session: null };
+      return {
+        status: latest.status as "pending" | "verified" | "expired" | "revoked" | "none",
+        session: latest,
+      };
+    }),
 
   getStatus: protectedProcedure.query(async ({ ctx }) => {
     const [latest] = await ctx.db
