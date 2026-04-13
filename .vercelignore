@@ -1,0 +1,7 @@
+node_modules
+programs
+server
+docker-compose.yml
+.env*
+.DS_Store
+*.log
