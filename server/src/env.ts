@@ -11,12 +11,16 @@ const envSchema = z.object({
   DINO_GOV_PROGRAM_ID: z.string().default("11111111111111111111111111111111"),
   HELIUS_API_KEY: z.string().default(""),
   WEBHOOK_SECRET: z.string().default("dev-webhook-secret"),
+  KYC_PROVIDER: z.enum(["dev", "didit"]).default("dev"),
   KYC_PROVIDER_API_KEY: z.string().optional(),
+  KYC_WEBHOOK_SECRET: z.string().optional(),
+  KYC_REDIRECT_URL: z.string().default("https://www.dinosecurities.com/app/settings?kyc=callback"),
   SETTLEMENT_AGENT_KEY: z.string().optional(),
   IRYS_WALLET_KEY: z.string().optional(),
   PINATA_API_KEY: z.string().optional(),
   PINATA_SECRET_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().default("http://localhost:8080"),
+  ADMIN_WALLETS: z.string().default(""),
 });
 
 export const env = envSchema.parse(process.env);
