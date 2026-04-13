@@ -10,6 +10,7 @@
  */
 import { Connection, PublicKey } from "@solana/web3.js";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import bs58 from "bs58";
 import { createRequire } from "node:module";
 import { env } from "../env.js";
 
@@ -55,7 +56,7 @@ export async function fetchSeriesOnChain(): Promise<OnChainSeriesRow[]> {
 
   const accounts = await connection.getProgramAccounts(programId, {
     commitment: "confirmed",
-    filters: [{ memcmp: { offset: 0, bytes: encodeBase58(SERIES_DISCRIMINATOR) } }],
+    filters: [{ memcmp: { offset: 0, bytes: bs58.encode(SERIES_DISCRIMINATOR) } }],
   });
 
   const rows: OnChainSeriesRow[] = [];
@@ -104,20 +105,3 @@ function enumKey(v: any): string {
   return k.charAt(0).toUpperCase() + k.slice(1);
 }
 
-// Minimal base58 encoder — avoids pulling bs58 just for filter encoding.
-function encodeBase58(bytes: Buffer): string {
-  const ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
-  let value = BigInt(0);
-  for (const b of bytes) value = (value << 8n) + BigInt(b);
-  let result = "";
-  while (value > 0) {
-    const mod = value % 58n;
-    result = ALPHABET[Number(mod)] + result;
-    value = value / 58n;
-  }
-  for (const b of bytes) {
-    if (b === 0) result = "1" + result;
-    else break;
-  }
-  return result;
-}
