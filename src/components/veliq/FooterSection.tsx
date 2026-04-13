@@ -27,9 +27,18 @@ const footerLinks = {
 const FooterSection = () => {
   const [email, setEmail] = useState("");
   const [showToast, setShowToast] = useState(false);
+  const [error, setError] = useState("");
 
   const handleSubscribe = () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    if (!email.trim()) {
+      setError("Please enter your email address.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    setError("");
     setShowToast(true);
     setEmail("");
     setTimeout(() => setShowToast(false), 4000);
@@ -72,15 +81,18 @@ const FooterSection = () => {
           <h2 className="text-3xl font-light text-foreground mb-8 tracking-tight">Stay Updated</h2>
 
           <div className="flex flex-col gap-3">
-            <div className="flex items-center bg-background border border-border p-1">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && handleSubscribe()}
-                placeholder="ENTER_EMAIL"
-                className="bg-transparent font-mono text-xs uppercase tracking-widest text-foreground px-4 py-3 w-full focus:outline-none placeholder:text-muted-foreground/40"
-              />
+            <div>
+              <div className={`flex items-center bg-background border p-1 ${error ? "border-red-500/60" : "border-border"}`}>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => { setEmail(e.target.value); if (error) setError(""); }}
+                  onKeyDown={(e) => e.key === "Enter" && handleSubscribe()}
+                  placeholder="ENTER_EMAIL"
+                  className="bg-transparent font-mono text-xs uppercase tracking-widest text-foreground px-4 py-3 w-full focus:outline-none placeholder:text-muted-foreground/40"
+                />
+              </div>
+              {error && <p className="text-xs text-red-400 mt-2 font-mono">{error}</p>}
             </div>
             <button
               onClick={handleSubscribe}
