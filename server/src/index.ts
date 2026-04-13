@@ -2,11 +2,13 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
+import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers/index.js";
 import { createContext } from "./context.js";
 import { heliusWebhookHandler } from "./webhooks/helius.js";
 import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
+import { uploadDocument } from "./services/arweave.js";
 import { env } from "./env.js";
 
 const app = express();
@@ -72,6 +74,26 @@ app.post("/webhooks/kyc", webhookLimiter, async (req, res) => {
   } catch (err) {
     console.error("KYC webhook error:", err);
     res.status(500).json({ error: "Internal error" });
+  }
+});
+
+// Document upload — multipart, capped at 50 MB to match the wizard's
+// declared limit. Hands the file to Irys → Arweave and returns the URI.
+const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 50 * 1024 * 1024 } });
+const uploadLimiter = rateLimit({ windowMs: 60_000, limit: 30 });
+app.post("/upload-document", uploadLimiter, upload.single("file"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: "no file" });
+    const result = await uploadDocument(req.file.buffer, {
+      contentType: req.file.mimetype || "application/pdf",
+      securityType: typeof req.body?.securityType === "string" ? req.body.securityType : undefined,
+      isin: typeof req.body?.isin === "string" ? req.body.isin : undefined,
+      jurisdiction: typeof req.body?.jurisdiction === "string" ? req.body.jurisdiction : undefined,
+    });
+    res.json(result);
+  } catch (err: any) {
+    console.error("upload-document failed:", err);
+    res.status(500).json({ error: err?.message ?? "upload failed" });
   }
 });
 

@@ -13,6 +13,10 @@
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.32.1",
+    "@irys/upload": "^0.0.15",
+    "@irys/upload-solana": "^0.1.8",
+    "multer": "^1.4.5-lts.1",
+    "@types/multer": "^1.4.12",
     "@solana/web3.js": "^1.98.0",
     "@trpc/server": "^11.1.0",
     "bs58": "^6.0.0",
