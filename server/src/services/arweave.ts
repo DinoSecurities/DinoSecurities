@@ -1,9 +1,12 @@
 import crypto from "node:crypto";
+import fs from "node:fs";
 import { env } from "../env.js";
 
 interface UploadResult {
   uri: string;
   hash: string;
+  txId?: string;
+  bytes: number;
 }
 
 interface IrysTags {
@@ -14,42 +17,84 @@ interface IrysTags {
   seriesMint?: string;
 }
 
+let cachedUploader: any | null = null;
+
 /**
- * Upload a legal document to Arweave via Irys (Bundlr).
- * Returns the Arweave URI and SHA-256 hash.
+ * Lazily build the Irys uploader. Importing @irys/upload is heavy and
+ * fails fast in environments without the wallet, so we only do it on
+ * the first real upload request.
+ */
+async function getUploader(): Promise<any | null> {
+  if (cachedUploader) return cachedUploader;
+  if (!env.IRYS_WALLET_KEY) return null;
+
+  let secretKey: string;
+  if (env.IRYS_WALLET_KEY.trim().startsWith("[")) {
+    // Inline JSON byte array (passed through env)
+    const bytes = Uint8Array.from(JSON.parse(env.IRYS_WALLET_KEY));
+    const bs58 = (await import("bs58")).default;
+    secretKey = bs58.encode(bytes);
+  } else if (fs.existsSync(env.IRYS_WALLET_KEY)) {
+    // Path to a Solana keypair JSON file
+    const bytes = Uint8Array.from(JSON.parse(fs.readFileSync(env.IRYS_WALLET_KEY, "utf8")));
+    const bs58 = (await import("bs58")).default;
+    secretKey = bs58.encode(bytes);
+  } else {
+    // Already a base58 string
+    secretKey = env.IRYS_WALLET_KEY;
+  }
+
+  try {
+    const { Uploader } = (await import("@irys/upload")) as any;
+    const { Solana } = (await import("@irys/upload-solana")) as any;
+    const isDevnet = (env.SOLANA_RPC_URL || "").includes("devnet");
+    const uploader = await Uploader(Solana)
+      .withWallet(secretKey)
+      .withRpc(env.SOLANA_RPC_URL || "https://api.devnet.solana.com");
+    if (isDevnet) (uploader as any).withRpc?.(env.SOLANA_RPC_URL).devnet?.();
+    cachedUploader = uploader;
+    return uploader;
+  } catch (err) {
+    console.warn("Irys uploader init failed, falling back to dev URIs:", err);
+    return null;
+  }
+}
+
+/**
+ * Upload a legal document to Arweave via Irys. Returns the Arweave URI,
+ * SHA-256 hash, and the underlying tx id. Falls back to a deterministic
+ * mock URI if no Irys wallet is configured (development mode).
  */
 export async function uploadDocument(
   file: Buffer,
   tags: IrysTags,
 ): Promise<UploadResult> {
   const hash = crypto.createHash("sha256").update(file).digest("hex");
+  const bytes = file.byteLength;
 
-  if (!env.IRYS_WALLET_KEY) {
-    // Dev mode — return mock URI
-    console.warn("IRYS_WALLET_KEY not set, returning mock Arweave URI");
-    return {
-      uri: `ar://dev-${hash.slice(0, 16)}`,
-      hash,
-    };
+  const uploader = await getUploader();
+  if (!uploader) {
+    return { uri: `ar://dev-${hash.slice(0, 16)}`, hash, bytes };
   }
 
-  // TODO: Initialize Irys client and upload
-  // const irys = new Irys({ url: "https://node1.irys.xyz", token: "solana", key: env.IRYS_WALLET_KEY });
-  // await irys.ready();
-  // const receipt = await irys.upload(file, {
-  //   tags: [
-  //     { name: "Content-Type", value: tags.contentType },
-  //     { name: "App-Name", value: "DinoSecurities" },
-  //     { name: "Document-Hash", value: hash },
-  //     ...(tags.securityType ? [{ name: "Security-Type", value: tags.securityType }] : []),
-  //     ...(tags.isin ? [{ name: "ISIN", value: tags.isin }] : []),
-  //     ...(tags.jurisdiction ? [{ name: "Jurisdiction", value: tags.jurisdiction }] : []),
-  //     ...(tags.seriesMint ? [{ name: "Series-Mint", value: tags.seriesMint }] : []),
-  //   ],
-  // });
-  // return { uri: `https://arweave.net/${receipt.id}`, hash };
+  const tagList = [
+    { name: "Content-Type", value: tags.contentType },
+    { name: "App-Name", value: "DinoSecurities" },
+    { name: "App-Version", value: "0.2.0" },
+    { name: "Document-Hash", value: hash },
+  ];
+  if (tags.securityType) tagList.push({ name: "Security-Type", value: tags.securityType });
+  if (tags.isin) tagList.push({ name: "ISIN", value: tags.isin });
+  if (tags.jurisdiction) tagList.push({ name: "Jurisdiction", value: tags.jurisdiction });
+  if (tags.seriesMint) tagList.push({ name: "Series-Mint", value: tags.seriesMint });
 
-  return { uri: `ar://dev-${hash.slice(0, 16)}`, hash };
+  const receipt = await uploader.upload(file, { tags: tagList });
+  return {
+    uri: `ar://${receipt.id}`,
+    txId: receipt.id,
+    hash,
+    bytes,
+  };
 }
 
 /**
