@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { Link } from "react-router-dom";
+import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -11,9 +11,11 @@ import {
   Check,
   Loader2,
   AlertCircle,
+  ExternalLink,
 } from "lucide-react";
-import { useCreateSecuritySeries } from "@/hooks/useDinoCore";
 import { toast } from "sonner";
+import { createSecuritySeriesOnChain, hashFile } from "@/lib/createSeriesOnChain";
+import { getExplorerUrl, truncateAddress } from "@/lib/solana";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -26,9 +28,9 @@ const STEPS = [
 ];
 
 const CreateSeries = () => {
-  const navigate = useNavigate();
   const { connected } = useWallet();
-  const createSeries = useCreateSecuritySeries();
+  const wallet = useWallet();
+  const { connection } = useConnection();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(1);
@@ -53,6 +55,8 @@ const CreateSeries = () => {
     deploying: false,
     deployed: false,
     txSignature: "",
+    mintAddress: "",
+    deployError: "",
   });
 
   const updateField = (field: string, value: any) => {
@@ -71,17 +75,32 @@ const CreateSeries = () => {
 
   const handleDeploy = async () => {
     updateField("deploying", true);
+    updateField("deployError", "");
     try {
-      // TODO: Real deployment flow:
-      // 1. Upload doc to Arweave via Irys
-      // 2. Create Token-2022 mint with extensions
-      // 3. Create SecuritySeries PDA
-      // 4. Initialize Transfer Hook
-      toast.success("Security series created successfully (simulated)");
+      const docHash = formData.legalDocFile
+        ? await hashFile(formData.legalDocFile)
+        : undefined;
+
+      const result = await createSecuritySeriesOnChain(connection, wallet, {
+        name: formData.name,
+        symbol: formData.symbol,
+        securityType: formData.securityType,
+        jurisdiction: formData.jurisdiction,
+        maxSupply: BigInt(formData.maxSupply || "0"),
+        isin: formData.isin,
+        regulation: formData.regulation,
+        docUri: formData.docUri || undefined,
+        docHash,
+      });
+
+      toast.success(`Series live! Mint: ${truncateAddress(result.mintAddress)}`);
       updateField("deployed", true);
-      updateField("txSignature", "simulated_tx_" + Date.now());
+      updateField("mintAddress", result.mintAddress);
+      updateField("txSignature", result.signatures.createSeries);
     } catch (err: any) {
-      toast.error("Deployment failed: " + err.message);
+      const msg = err?.message ?? String(err);
+      updateField("deployError", msg);
+      toast.error("Deployment failed: " + msg);
     } finally {
       updateField("deploying", false);
     }
@@ -309,9 +328,28 @@ const CreateSeries = () => {
                 <div className="w-16 h-16 border border-emerald-400/40 bg-emerald-400/10 flex items-center justify-center">
                   <Check size={28} className="text-emerald-400" />
                 </div>
-                <div className="text-center">
-                  <h3 className="text-lg font-semibold text-foreground">Deployed Successfully</h3>
-                  <p className="text-xs text-muted-foreground font-mono mt-2">{formData.txSignature}</p>
+                <div className="text-center max-w-md">
+                  <h3 className="text-lg font-semibold text-foreground">Series Live On Devnet</h3>
+                  <div className="mt-3 flex flex-col gap-1 text-xs">
+                    <div className="text-muted-foreground">Mint:</div>
+                    <a
+                      href={getExplorerUrl(formData.mintAddress, "address")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary font-mono hover:underline flex items-center gap-1 justify-center"
+                    >
+                      {truncateAddress(formData.mintAddress)} <ExternalLink size={10} />
+                    </a>
+                    <div className="text-muted-foreground mt-2">Transaction:</div>
+                    <a
+                      href={getExplorerUrl(formData.txSignature, "tx")}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary font-mono hover:underline flex items-center gap-1 justify-center break-all"
+                    >
+                      {truncateAddress(formData.txSignature)} <ExternalLink size={10} />
+                    </a>
+                  </div>
                 </div>
                 <Link
                   to="/app/issue"
@@ -320,6 +358,11 @@ const CreateSeries = () => {
                   Back to Portal
                 </Link>
               </>
+            )}
+            {formData.deployError && !formData.deploying && !formData.deployed && (
+              <div className="border border-red-500/40 bg-red-500/10 p-4 text-xs text-red-400 max-w-md break-words">
+                {formData.deployError}
+              </div>
             )}
           </div>
         )}

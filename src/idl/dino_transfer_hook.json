@@ -1,0 +1,425 @@
+{
+  "address": "AnpFxJoxNSQEg1CMxM4pe1raqRtkDWzas2UPB4L55oKn",
+  "metadata": {
+    "name": "dino_transfer_hook",
+    "version": "0.1.0",
+    "spec": "0.1.0",
+    "description": "Created with Anchor"
+  },
+  "instructions": [
+    {
+      "name": "execute",
+      "docs": [
+        "Token-2022 calls this on every transfer of a hooked mint. We validate:",
+        "1. Series is not paused",
+        "2. Destination has a HolderRecord PDA (whitelisted)",
+        "3. Holder is not revoked",
+        "4. Holder is not frozen",
+        "5. Holder KYC is not expired",
+        "6. Reg D restriction: holder is accredited (when applicable)",
+        "",
+        "Mint authority + permanent delegate transfers (issuer / settlement",
+        "agent) still pass through this hook — that's by design: compliance",
+        "applies to every transfer regardless of who initiates it."
+      ],
+      "discriminator": [
+        130,
+        221,
+        242,
+        154,
+        13,
+        193,
+        189,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "source"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "destination"
+        },
+        {
+          "name": "source_owner"
+        },
+        {
+          "name": "extra_account_meta_list",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  116,
+                  114,
+                  97,
+                  45,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dino_core_program",
+          "address": "2357nPiEYZS5YFmMoviaS5f4jGBSEaV8hR5TZsXM25sA"
+        },
+        {
+          "name": "series",
+          "docs": [
+            "SecuritySeries PDA (TLV-resolved). Must be owned by dino_core; its",
+            "`mint` field must equal our mint (enforced by Anchor's account",
+            "deserialization via dino_core's discriminator + mint constraint)."
+          ]
+        },
+        {
+          "name": "destination_holder",
+          "docs": [
+            "Destination HolderRecord (TLV-resolved using destination_owner from",
+            "the destination token account's data bytes [32..64]). The PDA is",
+            "derived deterministically by Token-2022's TLV resolver, so if the",
+            "supplied account doesn't match the derived address Token-2022 itself",
+            "rejects the transfer before our hook runs."
+          ]
+        }
+      ],
+      "args": [
+        {
+          "name": "_amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "initialize_extra_account_meta_list",
+      "docs": [
+        "One-time per mint. Allocates the ExtraAccountMetaList PDA that tells",
+        "Token-2022 which accounts to inject when calling `execute`."
+      ],
+      "discriminator": [
+        92,
+        197,
+        174,
+        197,
+        41,
+        124,
+        19,
+        3
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "extra_account_meta_list",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  120,
+                  116,
+                  114,
+                  97,
+                  45,
+                  97,
+                  99,
+                  99,
+                  111,
+                  117,
+                  110,
+                  116,
+                  45,
+                  109,
+                  101,
+                  116,
+                  97,
+                  115
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "HolderRecord",
+      "discriminator": [
+        215,
+        67,
+        31,
+        41,
+        155,
+        251,
+        178,
+        128
+      ]
+    },
+    {
+      "name": "SecuritySeries",
+      "discriminator": [
+        46,
+        194,
+        184,
+        48,
+        212,
+        145,
+        198,
+        58
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "SeriesPaused",
+      "msg": "Series is paused — transfers disabled"
+    },
+    {
+      "code": 6001,
+      "name": "HolderMintMismatch",
+      "msg": "Holder record mint does not match transfer mint"
+    },
+    {
+      "code": 6002,
+      "name": "HolderRevoked",
+      "msg": "Recipient holder has been revoked"
+    },
+    {
+      "code": 6003,
+      "name": "HolderFrozen",
+      "msg": "Recipient holder is frozen"
+    },
+    {
+      "code": 6004,
+      "name": "HolderKycExpired",
+      "msg": "Recipient holder KYC has expired"
+    },
+    {
+      "code": 6005,
+      "name": "AccreditationRequired",
+      "msg": "Reg D requires accredited investor status"
+    }
+  ],
+  "types": [
+    {
+      "name": "HolderRecord",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "kyc_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "kyc_expiry",
+            "type": "i64"
+          },
+          {
+            "name": "is_accredited",
+            "type": "bool"
+          },
+          {
+            "name": "is_frozen",
+            "type": "bool"
+          },
+          {
+            "name": "is_revoked",
+            "type": "bool"
+          },
+          {
+            "name": "jurisdiction",
+            "type": {
+              "array": [
+                "u8",
+                2
+              ]
+            }
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecuritySeries",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "issuer",
+            "type": "pubkey"
+          },
+          {
+            "name": "mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "symbol",
+            "type": "string"
+          },
+          {
+            "name": "security_type",
+            "type": {
+              "defined": {
+                "name": "SecurityType"
+              }
+            }
+          },
+          {
+            "name": "doc_hash",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "doc_uri",
+            "type": "string"
+          },
+          {
+            "name": "isin",
+            "type": "string"
+          },
+          {
+            "name": "max_supply",
+            "type": "u64"
+          },
+          {
+            "name": "current_supply",
+            "type": "u64"
+          },
+          {
+            "name": "transfer_restriction",
+            "type": {
+              "defined": {
+                "name": "TransferRestriction"
+              }
+            }
+          },
+          {
+            "name": "paused",
+            "type": "bool"
+          },
+          {
+            "name": "governance_realm",
+            "type": "pubkey"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SecurityType",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Equity"
+          },
+          {
+            "name": "Debt"
+          },
+          {
+            "name": "FundInterest"
+          },
+          {
+            "name": "LlcMembership"
+          }
+        ]
+      }
+    },
+    {
+      "name": "TransferRestriction",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "None"
+          },
+          {
+            "name": "RegD"
+          },
+          {
+            "name": "RegS"
+          },
+          {
+            "name": "RegCf"
+          },
+          {
+            "name": "RegAPlus"
+          },
+          {
+            "name": "Ricardian"
+          }
+        ]
+      }
+    }
+  ]
+}
