@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { createSecuritySeriesOnChain, hashFile } from "@/lib/createSeriesOnChain";
+import { uploadLegalDocument } from "@/lib/uploadDocument";
 import { getExplorerUrl, truncateAddress } from "@/lib/solana";
 
 type Step = 1 | 2 | 3 | 4 | 5;
@@ -57,7 +58,39 @@ const CreateSeries = () => {
     txSignature: "",
     mintAddress: "",
     deployError: "",
+    // Document upload state
+    uploading: false,
+    uploadError: "",
   });
+
+  const handleFile = async (file: File | null) => {
+    updateField("legalDocFile", file);
+    updateField("uploadError", "");
+    updateField("docUri", "");
+    updateField("docHash", "");
+    if (!file) return;
+    updateField("uploading", true);
+    try {
+      const res = await uploadLegalDocument({
+        file,
+        securityType: formData.securityType,
+        isin: formData.isin,
+        jurisdiction: formData.jurisdiction,
+      });
+      updateField("docUri", res.uri);
+      updateField("docHash", res.hash);
+      toast.success(
+        res.uri.startsWith("ar://dev-")
+          ? "Doc hashed (Irys not configured — using dev URI)"
+          : `Uploaded to Arweave: ${res.uri}`,
+      );
+    } catch (err: any) {
+      updateField("uploadError", err?.message ?? String(err));
+      toast.error("Upload failed: " + (err?.message ?? err));
+    } finally {
+      updateField("uploading", false);
+    }
+  };
 
   const updateField = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -65,7 +98,9 @@ const CreateSeries = () => {
 
   const canProceed = () => {
     switch (step) {
-      case 1: return formData.legalDocFile || formData.docUri;
+      // Step 1 is satisfied once we have a docUri — either from the Irys
+      // upload that just completed, or from a manually pasted ar:// link.
+      case 1: return Boolean(formData.docUri) && !formData.uploading;
       case 2: return formData.name && formData.symbol && formData.maxSupply;
       case 3: return true;
       case 4: return true;
@@ -77,9 +112,14 @@ const CreateSeries = () => {
     updateField("deploying", true);
     updateField("deployError", "");
     try {
-      const docHash = formData.legalDocFile
-        ? await hashFile(formData.legalDocFile)
-        : undefined;
+      // Prefer the server-returned hash from the Irys upload (authoritative),
+      // fall back to client-side hashing if the user pasted an ar:// URI
+      // without going through the upload flow.
+      const docHash = formData.docHash
+        ? Uint8Array.from((formData.docHash.match(/.{1,2}/g) ?? []).map((b) => parseInt(b, 16)))
+        : formData.legalDocFile
+          ? await hashFile(formData.legalDocFile)
+          : undefined;
 
       const result = await createSecuritySeriesOnChain(connection, wallet, {
         name: formData.name,
@@ -166,14 +206,27 @@ const CreateSeries = () => {
                 type="file"
                 accept=".pdf"
                 className="hidden"
-                onChange={(e) => {
-                  updateField("legalDocFile", e.target.files?.[0] ?? null);
-                }}
+                onChange={(e) => handleFile(e.target.files?.[0] ?? null)}
               />
               {formData.legalDocFile && (
-                <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 border border-primary/30">
-                  <FileText size={14} className="text-primary" />
-                  <span className="text-xs text-foreground">{formData.legalDocFile.name}</span>
+                <div className="flex flex-col gap-2 w-full">
+                  <div className="flex items-center gap-2 bg-primary/10 px-4 py-2 border border-primary/30">
+                    <FileText size={14} className="text-primary" />
+                    <span className="text-xs text-foreground flex-1 truncate">{formData.legalDocFile.name}</span>
+                    {formData.uploading && <Loader2 size={12} className="text-primary animate-spin" />}
+                    {!formData.uploading && formData.docUri && <Check size={14} className="text-emerald-400" />}
+                  </div>
+                  {formData.docHash && (
+                    <div className="text-[10px] text-muted-foreground font-mono">
+                      sha256: {formData.docHash}
+                    </div>
+                  )}
+                  {formData.docUri && (
+                    <div className="text-[10px] text-primary font-mono truncate">{formData.docUri}</div>
+                  )}
+                  {formData.uploadError && (
+                    <div className="text-[10px] text-red-400">{formData.uploadError}</div>
+                  )}
                 </div>
               )}
             </div>
