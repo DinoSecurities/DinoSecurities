@@ -24,7 +24,11 @@ const SERIES_DISCRIMINATOR = (() => {
   return Buffer.from((acct as any)?.discriminator ?? []);
 })();
 
-const connection = new Connection(env.SOLANA_RPC_URL, "confirmed");
+// Helius free tier doesn't allow getProgramAccounts, which is what this
+// fetcher relies on. Always use the fallback RPC (public devnet) for
+// program-account scans even when SOLANA_RPC_URL points at Helius.
+const RPC_URL = env.SOLANA_RPC_FALLBACK || env.SOLANA_RPC_URL;
+const connection = new Connection(RPC_URL, "confirmed");
 const programId = new PublicKey(env.DINO_CORE_PROGRAM_ID);
 
 let cache: { ts: number; rows: OnChainSeriesRow[] } | null = null;
@@ -54,10 +58,14 @@ export async function fetchSeriesOnChain(): Promise<OnChainSeriesRow[]> {
   if (cache && Date.now() - cache.ts < TTL_MS) return cache.rows;
   if (SERIES_DISCRIMINATOR.length !== 8) return [];
 
-  const accounts = await connection.getProgramAccounts(programId, {
-    commitment: "confirmed",
-    filters: [{ memcmp: { offset: 0, bytes: bs58.encode(SERIES_DISCRIMINATOR) } }],
-  });
+  // Cap the RPC call at 8s so a slow/dead RPC doesn't make the route hang.
+  const accounts = await Promise.race([
+    connection.getProgramAccounts(programId, {
+      commitment: "confirmed",
+      filters: [{ memcmp: { offset: 0, bytes: bs58.encode(SERIES_DISCRIMINATOR) } }],
+    }),
+    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("RPC timeout")), 8000)),
+  ]);
 
   const rows: OnChainSeriesRow[] = [];
   for (const { account } of accounts) {
