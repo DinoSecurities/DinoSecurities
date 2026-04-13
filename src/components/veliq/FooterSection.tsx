@@ -1,4 +1,5 @@
-import { ArrowRight, Shield } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Shield, Check, X } from "lucide-react";
 import BeamLines from "./BeamLines";
 
 const footerLinks = {
@@ -23,7 +24,18 @@ const footerLinks = {
   ],
 };
 
-const FooterSection = () => (
+const FooterSection = () => {
+  const [email, setEmail] = useState("");
+  const [showToast, setShowToast] = useState(false);
+
+  const handleSubscribe = () => {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return;
+    setShowToast(true);
+    setEmail("");
+    setTimeout(() => setShowToast(false), 4000);
+  };
+
+  return (
   <footer className="w-full max-w-7xl mx-auto border-b border-border relative z-10 bg-background/90 backdrop-blur-sm">
     <div
       className="overflow-hidden md:px-12 w-full border-t border-border pt-24 px-6 pb-8 relative"
@@ -63,11 +75,17 @@ const FooterSection = () => (
             <div className="flex items-center bg-background border border-border p-1">
               <input
                 type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleSubscribe()}
                 placeholder="ENTER_EMAIL"
                 className="bg-transparent font-mono text-xs uppercase tracking-widest text-foreground px-4 py-3 w-full focus:outline-none placeholder:text-muted-foreground/40"
               />
             </div>
-            <button className="bg-foreground hover:opacity-90 text-background transition-colors duration-300 text-xs font-mono uppercase tracking-widest px-6 py-3.5 whitespace-nowrap font-semibold flex items-center justify-center gap-2 w-full">
+            <button
+              onClick={handleSubscribe}
+              className="bg-foreground hover:opacity-90 text-background transition-colors duration-300 text-xs font-mono uppercase tracking-widest px-6 py-3.5 whitespace-nowrap font-semibold flex items-center justify-center gap-2 w-full cursor-pointer"
+            >
               Subscribe
               <ArrowRight size={14} />
             </button>
@@ -112,7 +130,29 @@ const FooterSection = () => (
         </a>
       </div>
     </div>
+
+    {/* Subscribe toast */}
+    {showToast && (
+      <div className="fixed bottom-6 right-6 z-[200] animate-in slide-in-from-bottom-4 fade-in duration-300">
+        <div className="bg-card border border-primary/30 shadow-2xl p-5 flex items-start gap-4 max-w-sm"
+          style={{ boxShadow: "0 8px 32px rgba(139,92,246,0.2)" }}>
+          <div className="w-10 h-10 bg-primary/20 border border-primary/40 flex items-center justify-center shrink-0">
+            <Check size={18} className="text-primary" />
+          </div>
+          <div className="flex-1">
+            <div className="text-sm font-semibold text-foreground">Thank you for subscribing!</div>
+            <div className="text-xs text-muted-foreground mt-1">
+              You'll be the first to know about new securities, governance updates, and platform launches.
+            </div>
+          </div>
+          <button onClick={() => setShowToast(false)} className="text-muted-foreground hover:text-foreground shrink-0">
+            <X size={14} />
+          </button>
+        </div>
+      </div>
+    )}
   </footer>
-);
+  );
+};
 
 export default FooterSection;
