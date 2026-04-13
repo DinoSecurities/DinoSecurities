@@ -216,7 +216,7 @@ export async function createSecuritySeriesOnChain(
     )
     .add(initMintInitExtrasIx);
 
-  const sig1 = await sendAndConfirm(connection, wallet, tx1, [mintKeypair]);
+  const sig1 = await sendAndConfirm(connection, wallet, tx1, [mintKeypair], "mint init");
 
   // ---- Tx 2: register issuer if needed -----------------------------------
   let sig2: string | undefined;
@@ -242,7 +242,7 @@ export async function createSecuritySeriesOnChain(
       })
       .instruction();
     const tx2 = new Transaction().add(registerIx);
-    sig2 = await sendAndConfirm(connection, wallet, tx2, []);
+    sig2 = await sendAndConfirm(connection, wallet, tx2, [], "register issuer");
   }
 
   // ---- Tx 3: create the security series PDA ------------------------------
@@ -269,7 +269,7 @@ export async function createSecuritySeriesOnChain(
     })
     .instruction();
   const tx3 = new Transaction().add(createIx);
-  const sig3 = await sendAndConfirm(connection, wallet, tx3, []);
+  const sig3 = await sendAndConfirm(connection, wallet, tx3, [], "create series");
 
   return {
     mintAddress: mint.toBase58(),
@@ -283,18 +283,40 @@ async function sendAndConfirm(
   wallet: WalletContextState,
   tx: Transaction,
   extraSigners: Keypair[],
+  label: string,
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error("wallet missing");
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("finalized");
+  // Use "processed" so we always get the freshest blockhash — bypasses the
+  // RPC's preflight cache that otherwise reports "already processed" on
+  // retried tx flows where state machines partially completed.
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("processed");
   tx.recentBlockhash = blockhash;
   tx.feePayer = wallet.publicKey;
   for (const s of extraSigners) tx.partialSign(s);
   const signed = await wallet.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signed.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: "confirmed",
-  });
-  await connection.confirmTransaction({ signature: sig, blockhash, lastValidBlockHeight }, "confirmed");
+  let sig: string;
+  try {
+    sig = await connection.sendRawTransaction(signed.serialize(), {
+      // skipPreflight bypasses the simulator-cached "already processed"
+      // false-positive. The chain itself will still reject any duplicate
+      // when the actual write is attempted, so correctness isn't affected.
+      skipPreflight: true,
+      maxRetries: 3,
+    });
+  } catch (e: any) {
+    throw new Error(`[${label}] send failed: ${e?.message ?? e}`);
+  }
+  try {
+    const conf = await connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      "confirmed",
+    );
+    if (conf.value.err) {
+      throw new Error(`[${label}] tx ${sig} reverted: ${JSON.stringify(conf.value.err)}`);
+    }
+  } catch (e: any) {
+    throw new Error(`[${label}] confirm failed: ${e?.message ?? e}`);
+  }
   return sig;
 }
 
