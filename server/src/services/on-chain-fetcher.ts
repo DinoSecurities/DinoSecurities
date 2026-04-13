@@ -79,26 +79,38 @@ export async function fetchSeriesOnChain(): Promise<OnChainSeriesRow[]> {
   const rows: OnChainSeriesRow[] = [];
   for (const { account } of accounts) {
     try {
-      const decoded = accountsCoder.decode("SecuritySeries", account.data);
+      const d: any = accountsCoder.decode("SecuritySeries", account.data);
+      // Anchor 0.32 IDL preserves Rust snake_case for account fields, but
+      // some toolchains camelCase on decode — accept both.
+      const pick = <T,>(snake: string, camel: string): T | undefined =>
+        d[snake] !== undefined ? d[snake] : d[camel];
+      const docHash = pick<number[] | Buffer>("doc_hash", "docHash");
+      const docUri = pick<string>("doc_uri", "docUri");
+      const maxSupply = pick<any>("max_supply", "maxSupply");
+      const currentSupply = pick<any>("current_supply", "currentSupply");
+      const securityType = pick<any>("security_type", "securityType");
+      const transferRestriction = pick<any>("transfer_restriction", "transferRestriction");
+      const governanceRealm = pick<any>("governance_realm", "governanceRealm");
+      const createdAt = pick<any>("created_at", "createdAt");
       rows.push({
-        mintAddress: (decoded.mint as PublicKey).toBase58(),
-        issuer: (decoded.issuer as PublicKey).toBase58(),
-        name: String(decoded.name ?? ""),
-        symbol: String(decoded.symbol ?? ""),
-        securityType: enumKey(decoded.securityType),
-        docHash: Buffer.from(decoded.docHash).toString("hex"),
-        docUri: String(decoded.docUri ?? ""),
-        isin: decoded.isin ? String(decoded.isin) : null,
-        maxSupply: Number(decoded.maxSupply ?? 0),
-        currentSupply: Number(decoded.currentSupply ?? 0),
-        transferRestrictions: enumKey(decoded.transferRestriction),
+        mintAddress: (d.mint as PublicKey).toBase58(),
+        issuer: (d.issuer as PublicKey).toBase58(),
+        name: String(d.name ?? ""),
+        symbol: String(d.symbol ?? ""),
+        securityType: enumKey(securityType),
+        docHash: docHash ? Buffer.from(docHash as any).toString("hex") : "",
+        docUri: String(docUri ?? ""),
+        isin: d.isin ? String(d.isin) : null,
+        maxSupply: Number(maxSupply ?? 0),
+        currentSupply: Number(currentSupply ?? 0),
+        transferRestrictions: enumKey(transferRestriction),
         jurisdiction: "",
-        status: decoded.paused ? "paused" : "active",
+        status: d.paused ? "paused" : "active",
         governance:
-          decoded.governanceRealm && (decoded.governanceRealm as PublicKey).toBase58() !== "11111111111111111111111111111111"
-            ? (decoded.governanceRealm as PublicKey).toBase58()
+          governanceRealm && (governanceRealm as PublicKey).toBase58?.() !== "11111111111111111111111111111111"
+            ? (governanceRealm as PublicKey).toBase58?.() ?? null
             : null,
-        createdAt: new Date(Number(decoded.createdAt ?? 0) * 1000),
+        createdAt: new Date(Number(createdAt ?? 0) * 1000),
         indexedAt: new Date(),
         lastUpdated: new Date(),
       });
@@ -106,6 +118,7 @@ export async function fetchSeriesOnChain(): Promise<OnChainSeriesRow[]> {
       console.warn("series decode failed:", err);
     }
   }
+  console.log(`[on-chain-fetcher] decoded ${rows.length} series rows`);
 
   cache = { ts: Date.now(), rows };
   return rows;
