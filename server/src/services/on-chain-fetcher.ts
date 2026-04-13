@@ -25,11 +25,12 @@ const SERIES_DISCRIMINATOR = (() => {
 })();
 
 // Helius free tier doesn't allow getProgramAccounts, which is what this
-// fetcher relies on. Always use the fallback RPC (public devnet) for
-// program-account scans even when SOLANA_RPC_URL points at Helius.
-const RPC_URL = env.SOLANA_RPC_FALLBACK || env.SOLANA_RPC_URL;
+// fetcher relies on. Force the public devnet RPC for program-account
+// scans regardless of what SOLANA_RPC_URL points at.
+const RPC_URL = "https://api.devnet.solana.com";
 const connection = new Connection(RPC_URL, "confirmed");
 const programId = new PublicKey(env.DINO_CORE_PROGRAM_ID);
+console.log(`[on-chain-fetcher] scanning program ${programId.toBase58()} via ${RPC_URL}`);
 
 let cache: { ts: number; rows: OnChainSeriesRow[] } | null = null;
 const TTL_MS = 30_000;
@@ -58,14 +59,22 @@ export async function fetchSeriesOnChain(): Promise<OnChainSeriesRow[]> {
   if (cache && Date.now() - cache.ts < TTL_MS) return cache.rows;
   if (SERIES_DISCRIMINATOR.length !== 8) return [];
 
-  // Cap the RPC call at 8s so a slow/dead RPC doesn't make the route hang.
-  const accounts = await Promise.race([
-    connection.getProgramAccounts(programId, {
-      commitment: "confirmed",
-      filters: [{ memcmp: { offset: 0, bytes: bs58.encode(SERIES_DISCRIMINATOR) } }],
-    }),
-    new Promise<never>((_, rej) => setTimeout(() => rej(new Error("RPC timeout")), 8000)),
-  ]);
+  // Cap the RPC call so a slow/dead RPC doesn't make the route hang.
+  const t0 = Date.now();
+  let accounts;
+  try {
+    accounts = await Promise.race([
+      connection.getProgramAccounts(programId, {
+        commitment: "confirmed",
+        filters: [{ memcmp: { offset: 0, bytes: bs58.encode(SERIES_DISCRIMINATOR) } }],
+      }),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("RPC timeout after 20s")), 20000)),
+    ]);
+    console.log(`[on-chain-fetcher] got ${accounts.length} accounts in ${Date.now() - t0}ms`);
+  } catch (err) {
+    console.error(`[on-chain-fetcher] RPC failed after ${Date.now() - t0}ms:`, err);
+    throw err;
+  }
 
   const rows: OnChainSeriesRow[] = [];
   for (const { account } of accounts) {
