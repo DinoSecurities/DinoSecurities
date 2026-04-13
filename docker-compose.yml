@@ -1,0 +1,41 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: dino
+      POSTGRES_PASSWORD: dino_dev
+      POSTGRES_DB: dinosecurities
+    ports:
+      - "5432:5432"
+    volumes:
+      - dino_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dino -d dinosecurities"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  api:
+    build:
+      context: ./server
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PORT: 3001
+      DATABASE_URL: postgresql://dino:dino_dev@postgres:5432/dinosecurities
+      SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
+      DINO_CORE_PROGRAM_ID: 2pf1dBgNE3bZLgSKTuksipLXAtwCyCw292FiXgZaLMBU
+      DINO_HOOK_PROGRAM_ID: 4CkTV9Dj4KpYXAcxaJKWS68K8Nx6A6X6jbJdXwAMtVjQ
+      DINO_GOV_PROGRAM_ID: 2QfgykJcaQMPMngZ2jbVHxMByigjrLTUeei3cy1BAecb
+      HELIUS_API_KEY: ${HELIUS_API_KEY:-}
+      WEBHOOK_SECRET: ${WEBHOOK_SECRET:-dev-webhook-secret}
+      KYC_PROVIDER: ${KYC_PROVIDER:-dev}
+      KYC_PROVIDER_API_KEY: ${KYC_PROVIDER_API_KEY:-}
+      KYC_WEBHOOK_SECRET: ${KYC_WEBHOOK_SECRET:-}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
+    ports:
+      - "3001:3001"
+
+volumes:
+  dino_pg:
