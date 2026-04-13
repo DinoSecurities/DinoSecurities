@@ -1,7 +1,8 @@
 import { z } from "zod";
-import { eq, ilike, or, desc, asc } from "drizzle-orm";
+import { eq, ilike, or, desc } from "drizzle-orm";
 import { router, publicProcedure } from "../trpc.js";
 import { indexedSeries } from "../db/schema.js";
+import { fetchSeriesOnChain, fetchSeriesByMint } from "../services/on-chain-fetcher.js";
 
 export const securitiesRouter = router({
   list: publicProcedure
@@ -19,7 +20,6 @@ export const securitiesRouter = router({
       const offset = (page - 1) * limit;
 
       let query = ctx.db.select().from(indexedSeries).$dynamic();
-
       if (type) query = query.where(eq(indexedSeries.securityType, type));
       if (jurisdiction) query = query.where(eq(indexedSeries.jurisdiction, jurisdiction));
       if (status) query = query.where(eq(indexedSeries.status, status));
@@ -29,6 +29,17 @@ export const securitiesRouter = router({
         .limit(limit)
         .offset(offset);
 
+      // Fall back to a direct getProgramAccounts read when nothing is
+      // indexed yet — keeps the marketplace honest in the gap between an
+      // issuer creating a series and the Helius webhook firing.
+      if (results.length === 0 && page === 1) {
+        try {
+          const onChain = await fetchSeriesOnChain();
+          return { items: onChain.slice(0, limit), page, limit };
+        } catch (err) {
+          console.warn("on-chain fallback failed:", err);
+        }
+      }
       return { items: results, page, limit };
     }),
 
@@ -40,18 +51,29 @@ export const securitiesRouter = router({
         .from(indexedSeries)
         .where(eq(indexedSeries.mintAddress, input.mint))
         .limit(1);
-
-      return result ?? null;
+      if (result) return result;
+      try {
+        return await fetchSeriesByMint(input.mint);
+      } catch {
+        return null;
+      }
     }),
 
   getByIssuer: publicProcedure
     .input(z.object({ issuer: z.string() }))
     .query(async ({ ctx, input }) => {
-      return ctx.db
+      const rows = await ctx.db
         .select()
         .from(indexedSeries)
         .where(eq(indexedSeries.issuer, input.issuer))
         .orderBy(desc(indexedSeries.createdAt));
+      if (rows.length > 0) return rows;
+      try {
+        const onChain = await fetchSeriesOnChain();
+        return onChain.filter((s) => s.issuer === input.issuer);
+      } catch {
+        return [];
+      }
     }),
 
   search: publicProcedure
