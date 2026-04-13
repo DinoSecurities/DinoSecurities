@@ -1,111 +1,144 @@
 import { db } from "../db/index.js";
 import { indexedSeries, indexedHolders, settlementOrders } from "../db/schema.js";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
+import { decodeProgramEvents, type DinoEvent } from "./event-decoder.js";
 
 interface WebhookEvent {
   type?: string;
   signature?: string;
   description?: string;
-  accountData?: Array<{ account: string; nativeBalanceChange: number; tokenBalanceChanges: unknown[] }>;
-  instructions?: Array<{ programId: string; data: string; accounts: string[] }>;
-  events?: Record<string, unknown>;
+  meta?: { logMessages?: string[] };
+  logMessages?: string[];
   [key: string]: unknown;
 }
 
 /**
- * Route webhook events to specific handlers based on event type / instruction data.
- * The exact routing logic depends on the Anchor program instruction discriminators
- * which will be finalized when Sorrow deploys the programs.
+ * Helius webhook handler. Decodes Anchor events from program logs and
+ * dispatches each to its upsert handler. Idempotent: re-processing the same
+ * tx_signature is safe because handlers use ON CONFLICT upserts and the
+ * caller (helius.ts) writes a webhook_events row with tx_signature as PK.
  */
 export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
-  const eventType = detectEventType(event);
+  const logs =
+    event.logMessages ??
+    event.meta?.logMessages ??
+    [];
+  if (logs.length === 0) return;
 
-  switch (eventType) {
+  const events = decodeProgramEvents(logs);
+  for (const evt of events) {
+    try {
+      await dispatch(evt, event.signature);
+    } catch (err) {
+      console.error(`handler error for ${evt.name}:`, err);
+    }
+  }
+}
+
+async function dispatch(evt: DinoEvent, signature?: string) {
+  switch (evt.name) {
     case "SeriesCreated":
-      await handleSeriesCreated(event);
-      break;
+      return upsertSeries(evt.data);
     case "SecurityMinted":
-      await handleSecurityMinted(event);
-      break;
-    case "TransferValidated":
-      await handleTransferValidated(event);
-      break;
+      return bumpSupply(evt.data);
     case "HolderRegistered":
-      await handleHolderRegistered(event);
-      break;
+      return upsertHolder(evt.data);
     case "HolderRevoked":
-      await handleHolderRevoked(event);
-      break;
+      return revokeHolder(evt.data);
+    case "SeriesPauseChanged":
+      return setSeriesStatus(evt.data);
+    case "OrderCreated":
+      return insertOrder(evt.data, signature);
+    case "SettlementExecuted":
+      return markSettled(evt.data, signature);
     case "ProposalCreated":
-      await handleProposalCreated(event);
-      break;
-    case "VoteCast":
-      await handleVoteCast(event);
-      break;
+    case "ProposalFinalized":
     case "ProposalExecuted":
-      await handleProposalExecuted(event);
-      break;
+    case "VoteCast":
+    case "RealmCreated":
+      // Governance state lives off-chain in the proposal/vote PDAs; the
+      // governance router reads them on-demand via @coral-xyz/anchor. We
+      // could mirror to a `governance_proposals` table for fast list views
+      // but that's deferred until the UI proves the perf is needed.
+      return;
     default:
-      console.log("Unrecognized event type:", eventType);
+      console.log(`unhandled event: ${evt.name}`);
   }
 }
 
-/**
- * Detect event type from Helius enhanced transaction data.
- * This will be refined once the Anchor program IDLs are finalized.
- */
-function detectEventType(event: WebhookEvent): string {
-  // Helius enhanced events include a description field
-  if (event.description) {
-    if (event.description.includes("create_security_series")) return "SeriesCreated";
-    if (event.description.includes("mint_to")) return "SecurityMinted";
-    if (event.description.includes("transfer")) return "TransferValidated";
-    if (event.description.includes("register_holder")) return "HolderRegistered";
-    if (event.description.includes("revoke_holder")) return "HolderRevoked";
-    if (event.description.includes("create_proposal")) return "ProposalCreated";
-    if (event.description.includes("cast_vote")) return "VoteCast";
-    if (event.description.includes("execute")) return "ProposalExecuted";
-  }
-  return event.type || "unknown";
+async function upsertSeries(d: any) {
+  await db.insert(indexedSeries).values({
+    mintAddress: d.mint,
+    issuer: d.issuer,
+    name: d.symbol, // SeriesCreated event only carries symbol; full row populated by getProgramAccounts on first read
+    symbol: d.symbol,
+    securityType: "Equity",
+    docHash: "",
+    docUri: "",
+    isin: null,
+    maxSupply: Number(d.maxSupply ?? 0),
+    currentSupply: 0,
+    transferRestrictions: "None",
+    jurisdiction: "",
+    status: "active",
+  }).onConflictDoNothing({ target: indexedSeries.mintAddress });
 }
 
-async function handleSeriesCreated(event: WebhookEvent): Promise<void> {
-  // TODO: Decode SecuritySeries account data from transaction
-  // and upsert into indexed_series table
-  console.log("Processing SeriesCreated:", event.signature);
+async function bumpSupply(d: any) {
+  await db
+    .update(indexedSeries)
+    .set({ currentSupply: Number(d.newSupply ?? 0), lastUpdated: new Date() })
+    .where(eq(indexedSeries.mintAddress, d.mint));
 }
 
-async function handleSecurityMinted(event: WebhookEvent): Promise<void> {
-  // TODO: Update current_supply in indexed_series
-  console.log("Processing SecurityMinted:", event.signature);
+async function upsertHolder(d: any) {
+  await db
+    .insert(indexedHolders)
+    .values({
+      mintAddress: d.mint,
+      wallet: d.wallet,
+      isAccredited: Boolean(d.isAccredited),
+    })
+    .onConflictDoUpdate({
+      target: [indexedHolders.mintAddress, indexedHolders.wallet],
+      set: { isAccredited: Boolean(d.isAccredited), isRevoked: false },
+    });
 }
 
-async function handleTransferValidated(event: WebhookEvent): Promise<void> {
-  // TODO: Update holder registry, log transfer
-  console.log("Processing TransferValidated:", event.signature);
+async function revokeHolder(d: any) {
+  await db
+    .update(indexedHolders)
+    .set({ isRevoked: true })
+    .where(sql`${indexedHolders.mintAddress} = ${d.mint} AND ${indexedHolders.wallet} = ${d.wallet}`);
 }
 
-async function handleHolderRegistered(event: WebhookEvent): Promise<void> {
-  // TODO: Insert into indexed_holders
-  console.log("Processing HolderRegistered:", event.signature);
+async function setSeriesStatus(d: any) {
+  await db
+    .update(indexedSeries)
+    .set({ status: d.paused ? "paused" : "active", lastUpdated: new Date() })
+    .where(eq(indexedSeries.mintAddress, d.mint));
 }
 
-async function handleHolderRevoked(event: WebhookEvent): Promise<void> {
-  // TODO: Update indexed_holders set is_revoked = true
-  console.log("Processing HolderRevoked:", event.signature);
+async function insertOrder(d: any, signature?: string) {
+  await db.insert(settlementOrders).values({
+    orderId: d.order,
+    buyer: d.side === "Buy" ? d.creator : null,
+    seller: d.side === "Sell" ? d.creator : null,
+    securityMint: d.securityMint,
+    tokenAmount: Number(d.tokenAmount),
+    usdcAmount: Number(d.paymentAmount),
+    status: "open",
+    txSignature: signature ?? null,
+  }).onConflictDoNothing({ target: settlementOrders.orderId });
 }
 
-async function handleProposalCreated(event: WebhookEvent): Promise<void> {
-  // TODO: Index proposal from SPL Governance
-  console.log("Processing ProposalCreated:", event.signature);
-}
-
-async function handleVoteCast(event: WebhookEvent): Promise<void> {
-  // TODO: Update vote tally
-  console.log("Processing VoteCast:", event.signature);
-}
-
-async function handleProposalExecuted(event: WebhookEvent): Promise<void> {
-  // TODO: Log execution, update affected state
-  console.log("Processing ProposalExecuted:", event.signature);
+async function markSettled(d: any, signature?: string) {
+  await db
+    .update(settlementOrders)
+    .set({ status: "settled", settledAt: new Date(), txSignature: signature ?? null })
+    .where(eq(settlementOrders.orderId, d.buyOrder));
+  await db
+    .update(settlementOrders)
+    .set({ status: "settled", settledAt: new Date(), txSignature: signature ?? null })
+    .where(eq(settlementOrders.orderId, d.sellOrder));
 }
