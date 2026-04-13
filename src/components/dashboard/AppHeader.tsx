@@ -41,12 +41,11 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
   const location = useLocation();
   const { connected } = useWallet();
 
-  const notifications = [
-    { id: 1, title: "Settlement Completed", desc: "DvP order #1847 settled successfully", time: "2m ago", unread: true },
-    { id: 2, title: "New Proposal", desc: "Vote on Series A dividend distribution", time: "1h ago", unread: true },
-    { id: 3, title: "KYC Approved", desc: "Your identity verification is complete", time: "3h ago", unread: false },
-    { id: 4, title: "Transfer Received", desc: "500 DINO-EQ tokens received", time: "1d ago", unread: false },
-  ];
+  // Notifications surface real-time on-chain activity for the connected
+  // wallet. Backend will publish these via Helius webhook → Supabase →
+  // tRPC subscription in v0.2; until then we render the empty state so
+  // we don't lie about events that never happened.
+  const notifications: { id: number; title: string; desc: string; time: string; unread: boolean }[] = [];
 
   const pageName = (() => {
     if (location.pathname === "/app") return "Dashboard";
@@ -108,7 +107,9 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors relative"
             >
               <Bell size={18} />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
+              {notifications.some((n) => n.unread) && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-primary" />
+              )}
             </button>
             {notifOpen && (
               <>
@@ -116,33 +117,35 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
                 <div className="absolute right-0 top-full mt-2 w-80 bg-card border border-border shadow-2xl z-50">
                   <div className="p-4 border-b border-border flex items-center justify-between">
                     <span className="text-xs font-semibold uppercase tracking-widest text-foreground">Notifications</span>
-                    <span className="text-[10px] text-primary font-semibold">2 new</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {notifications.filter((n) => n.unread).length} new
+                    </span>
                   </div>
                   <div className="max-h-80 overflow-y-auto">
-                    {notifications.map((n) => (
-                      <button
-                        key={n.id}
-                        onClick={() => setNotifOpen(false)}
-                        className={`w-full text-left p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors ${n.unread ? "bg-primary/5" : ""}`}
-                      >
-                        <div className="flex items-start gap-3">
-                          {n.unread && <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />}
-                          {!n.unread && <div className="w-1.5 h-1.5 shrink-0" />}
-                          <div className="min-w-0">
-                            <div className="text-sm font-medium text-foreground truncate">{n.title}</div>
-                            <div className="text-xs text-muted-foreground mt-0.5">{n.desc}</div>
-                            <div className="text-[10px] text-muted-foreground/60 mt-1">{n.time}</div>
+                    {notifications.length === 0 ? (
+                      <div className="p-8 text-center text-xs text-muted-foreground">
+                        No notifications yet
+                      </div>
+                    ) : (
+                      notifications.map((n) => (
+                        <button
+                          key={n.id}
+                          onClick={() => setNotifOpen(false)}
+                          className={`w-full text-left p-4 border-b border-border/50 hover:bg-secondary/50 transition-colors ${n.unread ? "bg-primary/5" : ""}`}
+                        >
+                          <div className="flex items-start gap-3">
+                            {n.unread && <div className="w-1.5 h-1.5 rounded-full bg-primary mt-1.5 shrink-0" />}
+                            {!n.unread && <div className="w-1.5 h-1.5 shrink-0" />}
+                            <div className="min-w-0">
+                              <div className="text-sm font-medium text-foreground truncate">{n.title}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{n.desc}</div>
+                              <div className="text-[10px] text-muted-foreground/60 mt-1">{n.time}</div>
+                            </div>
                           </div>
-                        </div>
-                      </button>
-                    ))}
+                        </button>
+                      ))
+                    )}
                   </div>
-                  <button
-                    onClick={() => setNotifOpen(false)}
-                    className="w-full p-3 text-xs text-primary hover:bg-secondary/50 text-center font-semibold uppercase tracking-widest transition-colors"
-                  >
-                    View All
-                  </button>
                 </div>
               </>
             )}
