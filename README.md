@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://dinosecurities.vercel.app">Live Demo</a> &middot;
+  <a href="https://www.dinosecurities.com">Live Demo</a> &middot;
   <a href="https://x.com/SecuritiesDino">Twitter</a> &middot;
   <a href="#getting-started">Getting Started</a>
 </p>
