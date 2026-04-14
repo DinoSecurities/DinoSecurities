@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { ArrowLeft, ExternalLink, Copy, Check, FileText, Shield, Users, Loader2 } from "lucide-react";
 import { useIndexedSecurityByMint } from "@/hooks/useIndexedSecurities";
+import { useHoldersForMint } from "@/hooks/useHoldersForMint";
 import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { toast } from "sonner";
 
@@ -147,15 +148,7 @@ const SecurityDetail = () => {
         </div>
       )}
 
-      {activeTab === "holders" && (
-        <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-12 flex flex-col items-center text-center gap-2">
-          <Users size={32} className="text-muted-foreground" />
-          <div className="text-sm font-medium text-foreground">Holder list coming soon</div>
-          <p className="text-xs text-muted-foreground max-w-sm">
-            On-chain holder enumeration via dino_core HolderRecord PDAs is wired in the backend; UI rendering will land in v0.2.
-          </p>
-        </div>
-      )}
+      {activeTab === "holders" && <HoldersTab mint={s.mintAddress} />}
 
       {activeTab === "legal" && (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -228,5 +221,80 @@ const SecurityDetail = () => {
     </div>
   );
 };
+
+function HoldersTab({ mint }: { mint: string }) {
+  const holders = useHoldersForMint(mint);
+  const rows = holders.data ?? [];
+  if (holders.isLoading) {
+    return (
+      <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-12 text-center text-sm text-muted-foreground">
+        <Loader2 size={20} className="animate-spin inline mr-2" /> Loading holders…
+      </div>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-12 flex flex-col items-center text-center gap-2">
+        <Users size={32} className="text-muted-foreground" />
+        <div className="text-sm font-medium text-foreground">No holders yet</div>
+        <p className="text-xs text-muted-foreground max-w-sm">
+          Holders appear here once the issuer whitelists them via the Issuer Portal and compliance data is recorded in a HolderRecord PDA.
+        </p>
+      </div>
+    );
+  }
+  return (
+    <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01]">
+      <div className="p-4 border-b border-border flex items-center gap-2">
+        <Users size={16} className="text-muted-foreground" />
+        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+          {rows.length} holder{rows.length === 1 ? "" : "s"}
+        </span>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border/50 bg-secondary/30">
+              <th className="text-left p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Wallet</th>
+              <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold hidden md:table-cell">Jurisdiction</th>
+              <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">KYC</th>
+              <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Accredited</th>
+              <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((h, i) => (
+              <tr key={h.pda ?? `${h.wallet}-${i}`} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
+                <td className="p-4 font-mono text-xs text-foreground">{truncateAddress(h.wallet)}</td>
+                <td className="p-4 text-right text-xs text-muted-foreground hidden md:table-cell">{h.jurisdiction || "—"}</td>
+                <td className="p-4 text-right">
+                  <span className={`text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 ${
+                    h.isRevoked ? "text-red-400 bg-red-400/10" : "text-emerald-400 bg-emerald-400/10"
+                  }`}>
+                    {h.isRevoked ? "Revoked" : "Active"}
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className={`text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 ${
+                    h.isAccredited ? "text-primary bg-primary/10" : "text-muted-foreground bg-secondary"
+                  }`}>
+                    {h.isAccredited ? "Yes" : "No"}
+                  </span>
+                </td>
+                <td className="p-4 text-right">
+                  <span className={`text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 ${
+                    h.isFrozen ? "text-amber-400 bg-amber-400/10" : "text-muted-foreground bg-secondary"
+                  }`}>
+                    {h.isFrozen ? "Frozen" : "OK"}
+                  </span>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
 
 export default SecurityDetail;
