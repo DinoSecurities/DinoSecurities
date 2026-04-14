@@ -273,6 +273,29 @@ export async function createSecuritySeriesOnChain(
   };
 }
 
+async function withRetry<T>(label: string, fn: () => Promise<T>, attempts = 5): Promise<T> {
+  let lastErr: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastErr = e;
+      const msg = String(e?.message ?? e);
+      const transient =
+        msg.includes("503") ||
+        msg.includes("Service unavailable") ||
+        msg.includes("ETIMEDOUT") ||
+        msg.includes("fetch failed") ||
+        msg.includes("429");
+      if (!transient || i === attempts - 1) throw e;
+      const delay = 400 * Math.pow(2, i); // 400ms, 800, 1600, 3200, 6400
+      console.warn(`[${label}] transient RPC error, retrying in ${delay}ms:`, msg);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
 async function sendAndConfirm(
   connection: Connection,
   wallet: WalletContextState,
@@ -281,36 +304,30 @@ async function sendAndConfirm(
   label: string,
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error("wallet missing");
-  // Use "processed" so we always get the freshest blockhash — bypasses the
-  // RPC's preflight cache that otherwise reports "already processed" on
-  // retried tx flows where state machines partially completed.
-  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("processed");
+  // Fresh blockhash via "processed" bypasses the preflight cache's
+  // "already processed" false-positives on retried flows.
+  const { blockhash, lastValidBlockHeight } = await withRetry(
+    `${label} blockhash`,
+    () => connection.getLatestBlockhash("processed"),
+  );
   tx.recentBlockhash = blockhash;
   tx.feePayer = wallet.publicKey;
   for (const s of extraSigners) tx.partialSign(s);
   const signed = await wallet.signTransaction(tx);
-  let sig: string;
-  try {
-    sig = await connection.sendRawTransaction(signed.serialize(), {
-      // skipPreflight bypasses the simulator-cached "already processed"
-      // false-positive. The chain itself will still reject any duplicate
-      // when the actual write is attempted, so correctness isn't affected.
+  const sig = await withRetry(`${label} send`, () =>
+    connection.sendRawTransaction(signed.serialize(), {
       skipPreflight: true,
       maxRetries: 3,
-    });
-  } catch (e: any) {
-    throw new Error(`[${label}] send failed: ${e?.message ?? e}`);
-  }
-  try {
-    const conf = await connection.confirmTransaction(
+    }),
+  );
+  const conf = await withRetry(`${label} confirm`, () =>
+    connection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
       "confirmed",
-    );
-    if (conf.value.err) {
-      throw new Error(`[${label}] tx ${sig} reverted: ${JSON.stringify(conf.value.err)}`);
-    }
-  } catch (e: any) {
-    throw new Error(`[${label}] confirm failed: ${e?.message ?? e}`);
+    ),
+  );
+  if (conf.value.err) {
+    throw new Error(`[${label}] tx ${sig} reverted: ${JSON.stringify(conf.value.err)}`);
   }
   return sig;
 }
