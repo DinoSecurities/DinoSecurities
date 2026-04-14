@@ -1,166 +1,294 @@
-import { Connection, PublicKey, Transaction, Keypair } from "@solana/web3.js";
-import { db } from "../db/index.js";
-import { settlementOrders } from "../db/schema.js";
-import { eq, and } from "drizzle-orm";
-import { env } from "../env.js";
-import { connection } from "./solana-rpc.js";
-
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 2000;
-
 /**
- * Load the settlement agent keypair from environment.
- * In production this should reference an HSM.
+ * Settlement agent service.
+ *
+ * Polls open SettlementOrder PDAs on chain, finds compatible buy/sell
+ * pairs, and submits atomic DvP via dino_core.execute_settlement. The
+ * agent keypair signs the outer tx; inside dino_core the PDA + agent
+ * delegate authorisations move the tokens.
+ *
+ * No order-creation or order-cancellation happens here — those are
+ * user-driven. This service is purely the matching + execution leg.
  */
-function loadAgentKeypair(): Keypair | null {
-  if (!env.SETTLEMENT_AGENT_KEY) return null;
+import {
+  Connection,
+  Keypair,
+  PublicKey,
+  Transaction,
+  SystemProgram,
+  AccountMeta,
+} from "@solana/web3.js";
+import {
+  TOKEN_2022_PROGRAM_ID,
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+  getAssociatedTokenAddressSync,
+} from "@solana/spl-token";
+import * as anchor from "@coral-xyz/anchor";
+import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
+import bs58 from "bs58";
+import fs from "node:fs";
+import { createRequire } from "node:module";
+import { env } from "../env.js";
 
+const require = createRequire(import.meta.url);
+const dinoCoreIdl = require("../idl/dino_core.json") as Idl;
+
+const accountsCoder = new BorshAccountsCoder(dinoCoreIdl);
+const ORDER_DISCRIMINATOR: Buffer = (() => {
+  const acct = (dinoCoreIdl as any).accounts?.find((a: any) => a.name === "SettlementOrder");
+  return Buffer.from(acct?.discriminator ?? []);
+})();
+
+const RPC_URL = env.SOLANA_RPC_FALLBACK || env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+const connection = new Connection(RPC_URL, "confirmed");
+const programId = new PublicKey(env.DINO_CORE_PROGRAM_ID);
+const hookProgramId = new PublicKey(env.DINO_HOOK_PROGRAM_ID);
+
+let cachedAgent: Keypair | null = null;
+
+function loadAgent(): Keypair | null {
+  if (cachedAgent) return cachedAgent;
+  if (!env.SETTLEMENT_AGENT_KEY) return null;
   try {
-    // Expects a JSON array of bytes or a base58-encoded secret key
-    const raw = JSON.parse(env.SETTLEMENT_AGENT_KEY);
-    return Keypair.fromSecretKey(Uint8Array.from(raw));
-  } catch {
-    console.warn("Could not load settlement agent keypair");
+    const raw = env.SETTLEMENT_AGENT_KEY.trim();
+    const bytes: Uint8Array = raw.startsWith("[")
+      ? Uint8Array.from(JSON.parse(raw))
+      : fs.existsSync(raw)
+        ? Uint8Array.from(JSON.parse(fs.readFileSync(raw, "utf8")))
+        : bs58.decode(raw);
+    cachedAgent = Keypair.fromSecretKey(bytes);
+    return cachedAgent;
+  } catch (err) {
+    console.warn("[settlement-agent] failed to load keypair:", err);
     return null;
   }
 }
 
-/**
- * Match pending buy and sell orders for a given security.
- * Simple price-matching: exact match on usdcAmount/tokenAmount ratio.
- */
-export async function matchOrders(securityMint: string): Promise<number> {
-  const pending = await db
-    .select()
-    .from(settlementOrders)
-    .where(
-      and(
-        eq(settlementOrders.securityMint, securityMint),
-        eq(settlementOrders.status, "pending"),
-      ),
-    );
+function programFor(agent: Keypair): anchor.Program {
+  const wallet: any = {
+    publicKey: agent.publicKey,
+    signTransaction: async (tx: any) => { tx.partialSign(agent); return tx; },
+    signAllTransactions: async (txs: any[]) => { txs.forEach((t) => t.partialSign(agent)); return txs; },
+  };
+  const provider = new anchor.AnchorProvider(connection, wallet, { commitment: "confirmed" });
+  return new anchor.Program(dinoCoreIdl as any, provider);
+}
 
-  const buys = pending.filter((o) => o.buyer && !o.seller);
-  const sells = pending.filter((o) => o.seller && !o.buyer);
+interface OpenOrder {
+  pda: PublicKey;
+  creator: PublicKey;
+  side: "Buy" | "Sell";
+  securityMint: PublicKey;
+  paymentMint: PublicKey;
+  tokenAmount: bigint;
+  paymentAmount: bigint;
+  expiresAt: number;
+  nonce: anchor.BN;
+}
 
-  let matched = 0;
-
-  for (const buy of buys) {
-    const buyPrice = buy.usdcAmount / buy.tokenAmount;
-
-    const matchingSell = sells.find((s) => {
-      const sellPrice = s.usdcAmount / s.tokenAmount;
-      return (
-        s.tokenAmount === buy.tokenAmount &&
-        Math.abs(sellPrice - buyPrice) < 0.01
-      );
-    });
-
-    if (matchingSell) {
-      // Match the orders
-      await db
-        .update(settlementOrders)
-        .set({
-          seller: matchingSell.seller,
-          status: "matched",
-        })
-        .where(eq(settlementOrders.orderId, buy.orderId));
-
-      await db
-        .update(settlementOrders)
-        .set({
-          buyer: buy.buyer,
-          status: "matched",
-        })
-        .where(eq(settlementOrders.orderId, matchingSell.orderId));
-
-      // Remove from available sells
-      const idx = sells.indexOf(matchingSell);
-      if (idx !== -1) sells.splice(idx, 1);
-
-      matched++;
+async function fetchOpenOrders(): Promise<OpenOrder[]> {
+  if (ORDER_DISCRIMINATOR.length !== 8) return [];
+  const accounts = await connection.getProgramAccounts(programId, {
+    commitment: "confirmed",
+    filters: [{ memcmp: { offset: 0, bytes: bs58.encode(ORDER_DISCRIMINATOR) } }],
+  });
+  const now = Math.floor(Date.now() / 1000);
+  const out: OpenOrder[] = [];
+  for (const { pubkey, account } of accounts) {
+    try {
+      const d: any = accountsCoder.decode("SettlementOrder", account.data);
+      const statusKey = Object.keys(d.status ?? {})[0] ?? "open";
+      if (statusKey !== "open") continue;
+      const expiresAt = Number(d.expires_at ?? d.expiresAt ?? 0);
+      if (expiresAt <= now) continue;
+      out.push({
+        pda: pubkey,
+        creator: d.creator,
+        side: Object.keys(d.side)[0] === "sell" ? "Sell" : "Buy",
+        securityMint: d.security_mint ?? d.securityMint,
+        paymentMint: d.payment_mint ?? d.paymentMint,
+        tokenAmount: BigInt(d.token_amount?.toString() ?? d.tokenAmount?.toString() ?? "0"),
+        paymentAmount: BigInt(d.payment_amount?.toString() ?? d.paymentAmount?.toString() ?? "0"),
+        expiresAt,
+        nonce: new anchor.BN(d.nonce.toString()),
+      });
+    } catch {
+      // skip un-decodeable accounts
     }
   }
-
-  return matched;
+  return out;
 }
 
 /**
- * Execute an atomic DvP settlement for a matched order.
- *
- * Flow:
- * 1. Verify both parties have delegated to the agent
- * 2. Build atomic transaction: Leg 1 (security transfer) + Leg 2 (USDC transfer)
- * 3. Simulate, then submit
- * 4. Update DB status
+ * Simple exact-match: buy and sell must agree on security mint, payment
+ * mint, token amount, and payment amount. The agent is neutral — takes no
+ * fee and doesn't cross the spread. Pricing discovery is the users'
+ * responsibility. Anything fancier (partial fills, spread-matching, fees)
+ * belongs in a dedicated matching engine.
  */
-export async function executeSettlement(orderId: string): Promise<string> {
-  const agentKeypair = loadAgentKeypair();
-  if (!agentKeypair) {
-    throw new Error("Settlement agent keypair not configured");
-  }
-
-  const [order] = await db
-    .select()
-    .from(settlementOrders)
-    .where(eq(settlementOrders.orderId, orderId))
-    .limit(1);
-
-  if (!order) throw new Error("Order not found");
-  if (order.status !== "matched" && order.status !== "delegated") {
-    throw new Error(`Order not ready for settlement (status: ${order.status})`);
-  }
-  if (!order.buyer || !order.seller) {
-    throw new Error("Order missing buyer or seller");
-  }
-
-  // Update status to executing
-  await db
-    .update(settlementOrders)
-    .set({ status: "executing" })
-    .where(eq(settlementOrders.orderId, orderId));
-
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-    try {
-      // TODO: Build the actual atomic DvP transaction
-      // 1. Create transfer instruction: security tokens (seller -> buyer)
-      // 2. Create transfer instruction: USDC (buyer -> seller)
-      // 3. Both use the agent as delegate (Token-2022 approve was done by both parties)
-      // 4. Package into single transaction
-      // 5. Simulate
-      // 6. Sign with agent keypair and submit
-
-      // Placeholder — will be implemented when Anchor programs are deployed
-      const txSignature = `simulated-settlement-${orderId}-${Date.now()}`;
-
-      // Update status to settled
-      await db
-        .update(settlementOrders)
-        .set({
-          status: "settled",
-          txSignature,
-          settledAt: new Date(),
-        })
-        .where(eq(settlementOrders.orderId, orderId));
-
-      return txSignature;
-    } catch (err) {
-      lastError = err as Error;
-      console.error(`Settlement attempt ${attempt}/${MAX_RETRIES} failed:`, err);
-
-      if (attempt < MAX_RETRIES) {
-        await new Promise((r) => setTimeout(r, RETRY_DELAY_MS * attempt));
-      }
+function findMatches(orders: OpenOrder[]): Array<{ buy: OpenOrder; sell: OpenOrder }> {
+  const buys = orders.filter((o) => o.side === "Buy");
+  const sells = orders.filter((o) => o.side === "Sell");
+  const matches: Array<{ buy: OpenOrder; sell: OpenOrder }> = [];
+  const usedSells = new Set<string>();
+  for (const buy of buys) {
+    const sell = sells.find(
+      (s) =>
+        !usedSells.has(s.pda.toBase58()) &&
+        s.securityMint.equals(buy.securityMint) &&
+        s.paymentMint.equals(buy.paymentMint) &&
+        s.tokenAmount === buy.tokenAmount &&
+        s.paymentAmount === buy.paymentAmount &&
+        !s.creator.equals(buy.creator),
+    );
+    if (sell) {
+      matches.push({ buy, sell });
+      usedSells.add(sell.pda.toBase58());
     }
   }
+  return matches;
+}
 
-  // All retries failed — revert to created for retry
-  await db
-    .update(settlementOrders)
-    .set({ status: "failed" })
-    .where(eq(settlementOrders.orderId, orderId));
+async function pickTokenProgram(mint: PublicKey): Promise<PublicKey> {
+  const info = await connection.getAccountInfo(mint, "confirmed");
+  if (!info) throw new Error(`mint ${mint.toBase58()} not found`);
+  return info.owner.equals(TOKEN_2022_PROGRAM_ID) ? TOKEN_2022_PROGRAM_ID : TOKEN_PROGRAM_ID;
+}
 
-  throw new Error(`Settlement failed after ${MAX_RETRIES} attempts: ${lastError?.message}`);
+async function executeMatch(
+  agent: Keypair,
+  program: anchor.Program,
+  match: { buy: OpenOrder; sell: OpenOrder },
+): Promise<string> {
+  const { buy, sell } = match;
+  const [platformPda] = PublicKey.findProgramAddressSync([Buffer.from("platform")], programId);
+  const [seriesPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("series"), buy.securityMint.toBuffer()],
+    programId,
+  );
+
+  // ATAs. Security mint always lives under Token-2022; payment mint may be
+  // under either program (devnet USDC is classic Token).
+  const securityProgram = await pickTokenProgram(buy.securityMint);
+  const paymentProgram = await pickTokenProgram(buy.paymentMint);
+
+  const buyerPaymentAta = getAssociatedTokenAddressSync(
+    buy.paymentMint, buy.creator, false, paymentProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  const sellerPaymentAta = getAssociatedTokenAddressSync(
+    buy.paymentMint, sell.creator, false, paymentProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  const buyerSecurityAta = getAssociatedTokenAddressSync(
+    buy.securityMint, buy.creator, false, securityProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+  const sellerSecurityAta = getAssociatedTokenAddressSync(
+    buy.securityMint, sell.creator, false, securityProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+  );
+
+  // Transfer-hook extras. Token-2022 needs these in the outer tx so the
+  // CPI into dino_transfer_hook resolves correctly.
+  const [extraMetaPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("extra-account-metas"), buy.securityMint.toBuffer()],
+    hookProgramId,
+  );
+  const [destHolderPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("holder"), buy.securityMint.toBuffer(), buy.creator.toBuffer()],
+    programId,
+  );
+
+  const remainingAccounts: AccountMeta[] = [
+    { pubkey: hookProgramId, isSigner: false, isWritable: false },
+    { pubkey: extraMetaPda, isSigner: false, isWritable: false },
+    { pubkey: programId, isSigner: false, isWritable: false },
+    { pubkey: seriesPda, isSigner: false, isWritable: false },
+    { pubkey: destHolderPda, isSigner: false, isWritable: false },
+  ];
+
+  const ix = await program.methods
+    .executeSettlement()
+    .accountsStrict({
+      platform: platformPda,
+      series: seriesPda,
+      buyOrder: buy.pda,
+      sellOrder: sell.pda,
+      securityMint: buy.securityMint,
+      paymentMint: buy.paymentMint,
+      buyerPaymentAta,
+      sellerPaymentAta,
+      buyerSecurityAta,
+      sellerSecurityAta,
+      agent: agent.publicKey,
+      tokenProgram: securityProgram,
+    })
+    .remainingAccounts(remainingAccounts)
+    .instruction();
+
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("processed");
+  const tx = new Transaction().add(ix);
+  tx.recentBlockhash = blockhash;
+  tx.feePayer = agent.publicKey;
+  tx.sign(agent);
+  const sig = await connection.sendRawTransaction(tx.serialize(), {
+    skipPreflight: true,
+    maxRetries: 3,
+  });
+  const conf = await connection.confirmTransaction(
+    { signature: sig, blockhash, lastValidBlockHeight },
+    "confirmed",
+  );
+  if (conf.value.err) {
+    throw new Error(`executeSettlement tx ${sig} reverted: ${JSON.stringify(conf.value.err)}`);
+  }
+  return sig;
+}
+
+/**
+ * One tick of the matching loop: fetch open orders, find matches, execute
+ * each one. Returns the number of successful settlements.
+ */
+export async function runMatchingTick(): Promise<{ matched: number; settled: number; errors: number }> {
+  const agent = loadAgent();
+  if (!agent) return { matched: 0, settled: 0, errors: 0 };
+  const program = programFor(agent);
+  const orders = await fetchOpenOrders();
+  const matches = findMatches(orders);
+  if (matches.length === 0) return { matched: 0, settled: 0, errors: 0 };
+
+  console.log(`[settlement-agent] ${orders.length} open orders, ${matches.length} matchable`);
+  let settled = 0, errors = 0;
+  for (const m of matches) {
+    try {
+      const sig = await executeMatch(agent, program, m);
+      console.log(`[settlement-agent] settled ${m.buy.pda.toBase58().slice(0, 8)}..×${m.sell.pda.toBase58().slice(0, 8)}.. tx=${sig.slice(0, 8)}..`);
+      settled++;
+    } catch (err: any) {
+      console.error(`[settlement-agent] settle failed:`, err?.message ?? err);
+      errors++;
+    }
+  }
+  return { matched: matches.length, settled, errors };
+}
+
+/**
+ * Start the background matching loop. Polls every 30s. Safe to call once
+ * from the server entrypoint — idempotent if the agent key isn't configured
+ * (it'll just no-op each tick).
+ */
+export function startSettlementAgent() {
+  const agent = loadAgent();
+  if (!agent) {
+    console.log("[settlement-agent] SETTLEMENT_AGENT_KEY not configured — matching disabled");
+    return;
+  }
+  console.log(`[settlement-agent] starting with agent ${agent.publicKey.toBase58()}`);
+  const tick = async () => {
+    try {
+      await runMatchingTick();
+    } catch (err) {
+      console.error("[settlement-agent] tick failed:", err);
+    }
+  };
+  // First tick immediately, then every 30s.
+  void tick();
+  setInterval(tick, 30_000);
 }

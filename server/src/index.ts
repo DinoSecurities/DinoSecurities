@@ -9,6 +9,7 @@ import { createContext } from "./context.js";
 import { heliusWebhookHandler } from "./webhooks/helius.js";
 import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
 import { uploadDocument } from "./services/arweave.js";
+import { startSettlementAgent, runMatchingTick } from "./services/settlement-agent.js";
 import { env } from "./env.js";
 
 const app = express();
@@ -102,9 +103,25 @@ app.use("/trpc", apiLimiter, createExpressMiddleware({
   createContext,
 }));
 
+// Admin endpoint to trigger a matching tick on demand — useful for testing
+// and for operators who want to kick the queue without waiting 30s.
+app.post("/admin/run-matching", async (req, res) => {
+  const auth = req.header("authorization");
+  if (!auth || auth.trim() !== env.WEBHOOK_SECRET) {
+    return res.status(401).json({ error: "unauthorized" });
+  }
+  try {
+    const result = await runMatchingTick();
+    res.json(result);
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "tick failed" });
+  }
+});
+
 app.listen(env.PORT, () => {
   console.log(`DinoSecurities API running on port ${env.PORT}`);
   console.log(`  tRPC:     http://localhost:${env.PORT}/trpc`);
   console.log(`  Health:   http://localhost:${env.PORT}/health`);
   console.log(`  Webhooks: http://localhost:${env.PORT}/webhooks/helius`);
+  startSettlementAgent();
 });
