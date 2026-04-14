@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -14,8 +14,9 @@ import {
   X,
 } from "lucide-react";
 import { toast } from "sonner";
+import { PublicKey } from "@solana/web3.js";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
-import { truncateAddress, getExplorerUrl } from "@/lib/solana";
+import { truncateAddress, getExplorerUrl, PROGRAM_IDS } from "@/lib/solana";
 import { registerHolder, mintTokens, setSeriesPause } from "@/lib/issuerActions";
 
 type ActionType = "holder" | "mint" | "pause";
@@ -45,7 +46,19 @@ const IssuerPortal = () => {
   const [mintAmount, setMintAmount] = useState("");
 
   const { data: allSeries = [], isLoading: loading } = useIndexedSecurities();
-  const issuerSeries = allSeries.filter((s) => s.issuer === walletStr);
+  // `s.issuer` on indexed rows is the IssuerProfile PDA, not the wallet.
+  // Derive the PDA for the connected wallet and match against that.
+  const myIssuerPda = useMemo(() => {
+    if (!publicKey) return null;
+    const [pda] = PublicKey.findProgramAddressSync(
+      [Buffer.from("issuer"), publicKey.toBuffer()],
+      PROGRAM_IDS.DINO_CORE,
+    );
+    return pda.toBase58();
+  }, [publicKey]);
+  const issuerSeries = myIssuerPda
+    ? allSeries.filter((s) => s.issuer === myIssuerPda)
+    : [];
   const selected = issuerSeries.find((s) => s.mintAddress === selectedSeries);
 
   const closeModal = () => {
