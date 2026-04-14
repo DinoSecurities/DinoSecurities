@@ -112,6 +112,18 @@ app.get("/oracle-pubkey", (_req, res) => {
   const pk = getOraclePubkey();
   res.json({ pubkey: pk?.toBase58() ?? null });
 });
+// Plain-text diagnostic: which RPC, which program ID, which agent.
+// Exposed without auth because it leaks no secrets — all values are public.
+app.get("/agent-info", (_req, res) => {
+  res.json({
+    program: env.DINO_CORE_PROGRAM_ID,
+    rpcFallback: env.SOLANA_RPC_FALLBACK ?? null,
+    rpcPrimary: env.SOLANA_RPC_URL,
+    hasAgentKey: Boolean(env.SETTLEMENT_AGENT_KEY),
+    hasOracleKey: Boolean(env.KYC_ORACLE_KEY),
+    adminWallets: env.ADMIN_WALLETS || null,
+  });
+});
 app.post("/register-issuer", coSignLimiter, async (req, res) => {
   try {
     const { signedTxBase64 } = req.body ?? {};

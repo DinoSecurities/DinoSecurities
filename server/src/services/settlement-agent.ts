@@ -92,11 +92,17 @@ interface OpenOrder {
 }
 
 async function fetchOpenOrders(): Promise<OpenOrder[]> {
-  if (ORDER_DISCRIMINATOR.length !== 8) return [];
+  if (ORDER_DISCRIMINATOR.length !== 8) {
+    console.warn(`[settlement-agent] ORDER_DISCRIMINATOR.length = ${ORDER_DISCRIMINATOR.length} — IDL not loaded correctly`);
+    return [];
+  }
+  const filter = { memcmp: { offset: 0, bytes: bs58.encode(ORDER_DISCRIMINATOR) } };
+  console.log(`[settlement-agent] fetching orders: program=${programId.toBase58().slice(0, 8)}.. disc=${bs58.encode(ORDER_DISCRIMINATOR)}`);
   const accounts = await connection.getProgramAccounts(programId, {
     commitment: "confirmed",
-    filters: [{ memcmp: { offset: 0, bytes: bs58.encode(ORDER_DISCRIMINATOR) } }],
+    filters: [filter],
   });
+  console.log(`[settlement-agent] RPC returned ${accounts.length} raw accounts`);
   const now = Math.floor(Date.now() / 1000);
   const out: OpenOrder[] = [];
   for (const { pubkey, account } of accounts) {
