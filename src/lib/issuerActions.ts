@@ -70,7 +70,17 @@ export async function registerHolder(
   wallet: WalletContextState,
   params: RegisterHolderParams,
 ): Promise<string> {
-  if (!wallet.publicKey) throw new Error("wallet not connected");
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error("wallet not connected");
+
+  const oraclePubkeyStr = import.meta.env.VITE_KYC_ORACLE_PUBKEY;
+  const registerUrl = import.meta.env.VITE_REGISTER_HOLDER_URL;
+  if (!oraclePubkeyStr || !registerUrl) {
+    throw new Error(
+      "Holder registration is not configured. Set VITE_KYC_ORACLE_PUBKEY and VITE_REGISTER_HOLDER_URL.",
+    );
+  }
+  const oraclePubkey = new PublicKey(oraclePubkeyStr);
+
   const program = programFor(connection, wallet);
   const mint = new PublicKey(params.mint);
   const holder = new PublicKey(params.holderWallet);
@@ -99,18 +109,42 @@ export async function registerHolder(
     return [j.charCodeAt(0), j.charCodeAt(1)];
   })();
 
+  // The on-chain register_holder requires the KYC oracle to sign. We build
+  // the tx with the oracle as `signer` (account constraint), partial-sign
+  // with the user's wallet (fee payer), and post to the backend which
+  // co-signs with the oracle keypair before submitting.
   const ix = await program.methods
     .registerHolder(holder, kycHash, expiry, params.isAccredited, jurisdictionBytes)
     .accountsStrict({
       platform: platformPda,
       holder: holderPda,
       mint,
-      signer: wallet.publicKey,
+      signer: oraclePubkey,
       systemProgram: SystemProgram.programId,
     })
     .instruction();
 
-  return sendInstruction(connection, wallet, ix, "register holder");
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const tx = new Transaction().add(ix);
+  tx.feePayer = wallet.publicKey;
+  tx.recentBlockhash = blockhash;
+
+  const signed = await wallet.signTransaction(tx);
+  const serialized = signed
+    .serialize({ requireAllSignatures: false, verifySignatures: false })
+    .toString("base64");
+
+  const res = await fetch(registerUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signedTxBase64: serialized }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Holder registration failed: ${res.status} ${text}`);
+  }
+  const result = (await res.json()) as { signature: string };
+  return result.signature;
 }
 
 export interface MintTokensParams {
