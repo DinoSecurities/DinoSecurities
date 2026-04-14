@@ -214,9 +214,22 @@ export async function createSecuritySeriesOnChain(
   const sig1 = await sendAndConfirm(connection, wallet, tx1, [mintKeypair], "mint init");
 
   // ---- Tx 2: register issuer if needed -----------------------------------
+  // The on-chain register_issuer instruction requires both the user (authority)
+  // AND the KYC oracle to sign. The frontend partial-signs with the user's
+  // wallet, serializes the tx, and posts to the backend which co-signs with
+  // the oracle keypair before submitting.
   let sig2: string | undefined;
   const issuerAccount = await connection.getAccountInfo(issuerPda);
   if (!issuerAccount) {
+    const oraclePubkeyStr = import.meta.env.VITE_KYC_ORACLE_PUBKEY;
+    const registerUrl = import.meta.env.VITE_REGISTER_ISSUER_URL;
+    if (!oraclePubkeyStr || !registerUrl) {
+      throw new Error(
+        "Issuer registration is not configured. Set VITE_KYC_ORACLE_PUBKEY and VITE_REGISTER_ISSUER_URL.",
+      );
+    }
+    const oraclePubkey = new PublicKey(oraclePubkeyStr);
+
     const oneYear = Math.floor(Date.now() / 1000) + 365 * 24 * 3600;
     const kycHashBytes = Array.from(
       sha256(new TextEncoder().encode(`issuer:${issuer.toBase58()}`)),
@@ -231,13 +244,33 @@ export async function createSecuritySeriesOnChain(
       .accountsStrict({
         issuer: issuerPda,
         platform: platformPda,
-        oracle: issuer, // user is also acting as oracle (deployer wallet)
+        oracle: oraclePubkey,
         authority: issuer,
         systemProgram: SystemProgram.programId,
       })
       .instruction();
+
     const tx2 = new Transaction().add(registerIx);
-    sig2 = await sendAndConfirm(connection, wallet, tx2, [], "register issuer");
+    tx2.feePayer = issuer;
+    tx2.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
+
+    if (!wallet.signTransaction) throw new Error("Wallet does not support signing");
+    const signed = await wallet.signTransaction(tx2);
+    const serialized = signed
+      .serialize({ requireAllSignatures: false, verifySignatures: false })
+      .toString("base64");
+
+    const res = await fetch(registerUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tx: serialized }),
+    });
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Issuer registration failed: ${res.status} ${text}`);
+    }
+    const result = (await res.json()) as { signature: string };
+    sig2 = result.signature;
   }
 
   // ---- Tx 3: create the security series PDA ------------------------------
