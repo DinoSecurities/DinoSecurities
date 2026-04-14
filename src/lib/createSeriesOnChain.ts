@@ -33,8 +33,6 @@ import {
   createInitializeTransferHookInstruction,
   createInitializeMetadataPointerInstruction,
   createInitializePermanentDelegateInstruction,
-  createInitializeDefaultAccountStateInstruction,
-  AccountState,
 } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
@@ -137,11 +135,17 @@ export async function createSecuritySeriesOnChain(
   );
 
   // ---- Tx 1: init mint with extensions + extra metas ----------------------
+  // Note: we deliberately omit DefaultAccountState=Frozen. The Transfer Hook
+  // already enforces every compliance check (whitelist, accreditation,
+  // freeze status, jurisdiction) on every transfer. Default-freezing every
+  // new ATA on top of that blocks DvP settlement (the agent can't move
+  // tokens out of a frozen account) with no real security benefit — per-
+  // holder freeze via HolderRecord.is_frozen is still available when the
+  // issuer needs to pause a specific bad actor.
   const extensions = [
     ExtensionType.TransferHook,
     ExtensionType.MetadataPointer,
     ExtensionType.PermanentDelegate,
-    ExtensionType.DefaultAccountState,
   ];
   const mintLen = getMintLen(extensions);
   const mintRent = await connection.getMinimumBalanceForRentExemption(mintLen);
@@ -191,15 +195,6 @@ export async function createSecuritySeriesOnChain(
       createInitializePermanentDelegateInstruction(
         mint,
         seriesPda,
-        TOKEN_2022_PROGRAM_ID,
-      ),
-    )
-    // DefaultAccountState frozen — every new ATA starts frozen until the
-    // mint authority (seriesPda) explicitly thaws it.
-    .add(
-      createInitializeDefaultAccountStateInstruction(
-        mint,
-        AccountState.Frozen,
         TOKEN_2022_PROGRAM_ID,
       ),
     )
