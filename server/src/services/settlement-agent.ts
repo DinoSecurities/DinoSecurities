@@ -95,6 +95,8 @@ let lastFetchBreakdown = {
   raw: 0, decoded: 0, open: 0, dropped: 0,
   decodeErr: 0, notOpen: 0, expired: 0,
   statusKeys: [] as string[],
+  lastError: "" as string,
+  decodedFieldSample: null as any,
 };
 
 export function getLastFetchBreakdown() { return lastFetchBreakdown; }
@@ -114,11 +116,21 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
   const now = Math.floor(Date.now() / 1000);
   const out: OpenOrder[] = [];
   let decoded = 0, dropped = 0, decodeErr = 0, notOpen = 0, expired = 0;
+  let lastError = "", decodedFieldSample: any = null;
   const statusKeys = new Set<string>();
   for (const { pubkey, account } of accounts) {
     try {
       const d: any = accountsCoder.decode("SettlementOrder", account.data);
       decoded++;
+      if (decodedFieldSample === null) {
+        decodedFieldSample = {
+          keys: Object.keys(d),
+          creatorType: typeof d.creator,
+          nonceType: typeof d.nonce,
+          tokenAmountType: typeof (d.token_amount ?? d.tokenAmount),
+          securityMintType: typeof (d.security_mint ?? d.securityMint),
+        };
+      }
       // Anchor 0.32 emits enum variant keys in the original Rust case
       // ("Open" / "Buy" / "Sell"), not lowercase. Normalise for both.
       const rawStatus = Object.keys(d.status ?? {})[0] ?? "";
@@ -143,12 +155,18 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
       // skip un-decodeable accounts but track them
       dropped++;
       decodeErr++;
+      if (!lastError) lastError = (err as Error)?.message ?? String(err);
+      if (decodeErr <= 2) {
+        console.error(`[settlement-agent] decode/shape error on ${pubkey.toBase58()}:`, (err as Error)?.message);
+      }
     }
   }
   lastFetchBreakdown = {
     raw: accounts.length, decoded, open: out.length, dropped,
     decodeErr, notOpen, expired,
     statusKeys: Array.from(statusKeys),
+    lastError,
+    decodedFieldSample,
   };
   console.log(`[settlement-agent] fetchOpenOrders: ${accounts.length} raw -> ${decoded} decoded -> ${out.length} open (${dropped} dropped; notOpen=${notOpen} expired=${expired} decodeErr=${decodeErr}) statuses=${Array.from(statusKeys).join(",")}`);
   return out;
