@@ -335,17 +335,20 @@ export async function runMatchingTick(): Promise<{
   }
 
   let settled = 0, errors = 0;
+  const errorSamples: string[] = [];
   for (const m of matches) {
     try {
       const sig = await executeMatch(agent, program, m);
       console.log(`[settlement-agent] settled ${m.buy.pda.toBase58().slice(0, 8)}..×${m.sell.pda.toBase58().slice(0, 8)}.. tx=${sig.slice(0, 8)}..`);
       settled++;
     } catch (err: any) {
-      console.error(`[settlement-agent] settle failed:`, err?.message ?? err);
+      const msg = err?.message ?? String(err);
+      console.error(`[settlement-agent] settle failed:`, msg);
+      if (errorSamples.length < 2) errorSamples.push(msg);
       errors++;
     }
   }
-  return { matched: matches.length, settled, errors, agentLoaded: true, openOrders: orders.length };
+  return { matched: matches.length, settled, errors, agentLoaded: true, openOrders: orders.length, errorSamples };
 }
 
 /**
