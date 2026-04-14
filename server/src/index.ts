@@ -173,8 +173,12 @@ app.post("/admin/run-matching", async (req, res) => {
   }
 });
 
+const BUILD_MARKER = "v28bc88f-errorSamples";
+
+app.get("/build", (_req, res) => res.json({ build: BUILD_MARKER, startedAt: new Date().toISOString() }));
+
 app.listen(env.PORT, () => {
-  console.log(`DinoSecurities API running on port ${env.PORT}`);
+  console.log(`DinoSecurities API running on port ${env.PORT} [${BUILD_MARKER}]`);
   console.log(`  tRPC:     http://localhost:${env.PORT}/trpc`);
   console.log(`  Health:   http://localhost:${env.PORT}/health`);
   console.log(`  Webhooks: http://localhost:${env.PORT}/webhooks/helius`);
