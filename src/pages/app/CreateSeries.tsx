@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useWallet, useConnection } from "@solana/wallet-adapter-react";
 import {
@@ -35,6 +35,10 @@ const CreateSeries = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<Step>(1);
+  // Tracks whether the user has attempted to advance from step 2. Before
+  // that, inputs render neutral; after a failed "Next" click we mark them
+  // red until the user fixes them.
+  const [step2Attempted, setStep2Attempted] = useState(false);
   const [formData, setFormData] = useState({
     // Step 1: Legal doc
     legalDocFile: null as File | null,
@@ -96,16 +100,53 @@ const CreateSeries = () => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
+  // ---- Step 2 input sanitisation + validation ---------------------------
+  // Kept close to the render so the rules are obvious when reading the UI.
+  const MAX_SUPPLY_CAP = 10_000_000;
+  const sanitize = {
+    // Allow letters, numbers, spaces, common punctuation; cap at 64 chars.
+    name: (v: string) => v.replace(/[^A-Za-z0-9 ,.'&\-]/g, "").slice(0, 64),
+    // Symbols are uppercase + digits + hyphen only, up to 16 chars.
+    symbol: (v: string) => v.toUpperCase().replace(/[^A-Z0-9\-]/g, "").slice(0, 16),
+    // ISIN: 2 letters + 10 alphanumeric, always uppercased, 12 chars max.
+    isin: (v: string) => v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 12),
+    // Jurisdiction: 2 uppercase letters (ISO country code).
+    jurisdiction: (v: string) => v.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2),
+    // Max supply: digits only, no leading zeros beyond the first character.
+    maxSupply: (v: string) => v.replace(/[^0-9]/g, "").slice(0, 8),
+    // Description: no control chars; cap at 500.
+    description: (v: string) => v.replace(/[\u0000-\u001f\u007f]/g, "").slice(0, 500),
+  };
+
+  const errors = useMemo(() => {
+    const e: Record<string, string> = {};
+    if (!formData.name || formData.name.trim().length < 3) e.name = "At least 3 characters";
+    if (!formData.symbol || formData.symbol.length < 2) e.symbol = "2–16 uppercase chars";
+    if (formData.isin && formData.isin.length !== 12) e.isin = "ISIN must be 12 chars";
+    if (!formData.description || formData.description.trim().length < 10) e.description = "At least 10 characters";
+    const supply = Number(formData.maxSupply || 0);
+    if (!supply) e.maxSupply = "Required";
+    else if (supply > MAX_SUPPLY_CAP) e.maxSupply = `Cap is ${MAX_SUPPLY_CAP.toLocaleString()}`;
+    return e;
+  }, [formData.name, formData.symbol, formData.isin, formData.description, formData.maxSupply]);
+
   const canProceed = () => {
     switch (step) {
-      // Step 1 is satisfied once we have a docUri — either from the Irys
-      // upload that just completed, or from a manually pasted ar:// link.
       case 1: return Boolean(formData.docUri) && !formData.uploading;
-      case 2: return formData.name && formData.symbol && formData.maxSupply;
+      case 2: return Object.keys(errors).length === 0;
       case 3: return true;
       case 4: return true;
       default: return false;
     }
+  };
+
+  const handleNext = () => {
+    if (step === 2 && Object.keys(errors).length > 0) {
+      setStep2Attempted(true);
+      return;
+    }
+    if (step === 4) setStep(5);
+    else setStep((s) => Math.min(5, s + 1) as Step);
   };
 
   const handleDeploy = async () => {
@@ -243,50 +284,115 @@ const CreateSeries = () => {
         )}
 
         {/* Step 2: Metadata */}
-        {step === 2 && (
-          <div className="flex flex-col gap-5">
-            <h3 className="text-sm font-semibold text-foreground">Security Metadata</h3>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Name</label>
-                <input value={formData.name} onChange={(e) => updateField("name", e.target.value)} placeholder="DinoVentures Series A" className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50" />
+        {step === 2 && (() => {
+          const show = (field: string) => step2Attempted && errors[field];
+          const inputClass = (field: string) =>
+            `mt-2 w-full bg-secondary border px-4 py-2.5 text-sm text-foreground focus:outline-none placeholder:text-muted-foreground/50 ${
+              show(field) ? "border-red-500/70 focus:border-red-500" : "border-border focus:border-primary/50"
+            }`;
+          const errorText = (field: string) =>
+            show(field) ? <div className="text-[10px] text-red-400 mt-1">{errors[field]}</div> : null;
+          return (
+            <div className="flex flex-col gap-5">
+              <h3 className="text-sm font-semibold text-foreground">Security Metadata</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Name</label>
+                  <input
+                    value={formData.name}
+                    onChange={(e) => updateField("name", sanitize.name(e.target.value))}
+                    placeholder="DinoVentures Series A"
+                    maxLength={64}
+                    className={inputClass("name")}
+                  />
+                  {errorText("name")}
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Symbol</label>
+                  <input
+                    value={formData.symbol}
+                    onChange={(e) => updateField("symbol", sanitize.symbol(e.target.value))}
+                    placeholder="DINO-A"
+                    maxLength={16}
+                    className={inputClass("symbol")}
+                  />
+                  {errorText("symbol")}
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Security Type</label>
+                  <select
+                    value={formData.securityType}
+                    onChange={(e) => updateField("securityType", e.target.value)}
+                    className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none"
+                  >
+                    <option value="Equity">Equity</option>
+                    <option value="Debt">Debt</option>
+                    <option value="Fund">Fund</option>
+                    <option value="LLC">LLC</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Jurisdiction</label>
+                  <input
+                    value={formData.jurisdiction}
+                    onChange={(e) => updateField("jurisdiction", sanitize.jurisdiction(e.target.value))}
+                    placeholder="US"
+                    maxLength={2}
+                    className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50"
+                  />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                    Max Supply <span className="text-muted-foreground/60 normal-case">(cap {MAX_SUPPLY_CAP.toLocaleString()})</span>
+                  </label>
+                  <input
+                    value={formData.maxSupply}
+                    onChange={(e) => updateField("maxSupply", sanitize.maxSupply(e.target.value))}
+                    inputMode="numeric"
+                    placeholder="10000000"
+                    className={inputClass("maxSupply")}
+                  />
+                  {errorText("maxSupply")}
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">ISIN (optional)</label>
+                  <input
+                    value={formData.isin}
+                    onChange={(e) => updateField("isin", sanitize.isin(e.target.value))}
+                    placeholder="US1234567890"
+                    maxLength={12}
+                    className={inputClass("isin")}
+                  />
+                  {errorText("isin")}
+                </div>
               </div>
               <div>
-                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Symbol</label>
-                <input value={formData.symbol} onChange={(e) => updateField("symbol", e.target.value.toUpperCase())} placeholder="DINO-A" className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50" />
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                  Description <span className="text-muted-foreground/60 normal-case">({formData.description.length}/500)</span>
+                </label>
+                <textarea
+                  value={formData.description}
+                  onChange={(e) => updateField("description", sanitize.description(e.target.value))}
+                  rows={3}
+                  placeholder="Describe this security series…"
+                  className={`mt-2 w-full bg-secondary border px-4 py-2.5 text-sm text-foreground focus:outline-none placeholder:text-muted-foreground/50 resize-none ${
+                    show("description") ? "border-red-500/70 focus:border-red-500" : "border-border focus:border-primary/50"
+                  }`}
+                />
+                {errorText("description")}
               </div>
+              {step2Attempted && Object.keys(errors).length > 0 && (
+                <div className="border border-red-500/40 bg-red-500/10 p-3 text-xs text-red-400">
+                  Fix the highlighted fields before continuing.
+                </div>
+              )}
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Security Type</label>
-                <select value={formData.securityType} onChange={(e) => updateField("securityType", e.target.value)} className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none">
-                  <option value="Equity">Equity</option>
-                  <option value="Debt">Debt</option>
-                  <option value="Fund">Fund</option>
-                  <option value="LLC">LLC</option>
-                </select>
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Jurisdiction</label>
-                <input value={formData.jurisdiction} onChange={(e) => updateField("jurisdiction", e.target.value)} placeholder="US" className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50" />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Max Supply</label>
-                <input value={formData.maxSupply} onChange={(e) => updateField("maxSupply", e.target.value)} type="number" placeholder="10000000" className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50" />
-              </div>
-              <div>
-                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">ISIN (optional)</label>
-                <input value={formData.isin} onChange={(e) => updateField("isin", e.target.value)} placeholder="US1234567890" className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50" />
-              </div>
-            </div>
-            <div>
-              <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Description</label>
-              <textarea value={formData.description} onChange={(e) => updateField("description", e.target.value)} rows={3} placeholder="Describe this security series..." className="mt-2 w-full bg-secondary border border-border px-4 py-2.5 text-sm text-foreground focus:outline-none focus:border-primary/50 placeholder:text-muted-foreground/50 resize-none" />
-            </div>
-          </div>
-        )}
+          );
+        })()}
 
         {/* Step 3: Transfer Restrictions */}
         {step === 3 && (
@@ -432,8 +538,11 @@ const CreateSeries = () => {
             <ArrowLeft size={14} /> Back
           </button>
           <button
-            onClick={() => step === 4 ? setStep(5) : setStep((s) => Math.min(5, s + 1) as Step)}
-            disabled={!canProceed()}
+            onClick={handleNext}
+            // On step 2 the button stays enabled when invalid so the user
+            // gets the red-highlight feedback. Other steps still gate
+            // purely on canProceed().
+            disabled={step === 2 ? false : !canProceed()}
             className="flex items-center gap-2 px-6 py-2.5 bg-primary text-primary-foreground text-sm font-semibold uppercase tracking-widest hover:bg-primary/90 disabled:opacity-30 transition-colors"
           >
             {step === 4 ? "Deploy" : "Next"} <ArrowRight size={14} />
