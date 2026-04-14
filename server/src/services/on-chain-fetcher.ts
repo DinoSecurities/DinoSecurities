@@ -33,7 +33,11 @@ const programId = new PublicKey(env.DINO_CORE_PROGRAM_ID);
 console.log(`[on-chain-fetcher] scanning program ${programId.toBase58()} via ${RPC_URL}`);
 
 let cache: { ts: number; rows: OnChainSeriesRow[] } | null = null;
-const TTL_MS = 30_000;
+// Two-minute TTL to survive public-RPC rate limits. Once the Helius
+// webhook pipeline is populating indexed_series, this fetcher rarely
+// runs anyway (only when the DB query returns 0 rows).
+const TTL_MS = 120_000;
+const STALE_MAX_MS = 30 * 60_000; // serve stale up to 30 min on RPC failure
 
 export interface OnChainSeriesRow {
   mintAddress: string;
@@ -68,10 +72,17 @@ export async function fetchSeriesOnChain(): Promise<OnChainSeriesRow[]> {
         commitment: "confirmed",
         filters: [{ memcmp: { offset: 0, bytes: bs58.encode(SERIES_DISCRIMINATOR) } }],
       }),
-      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("RPC timeout after 20s")), 20000)),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error("RPC timeout after 15s")), 15000)),
     ]);
     console.log(`[on-chain-fetcher] got ${accounts.length} accounts in ${Date.now() - t0}ms`);
   } catch (err) {
+    // On 503 / timeout / any transient RPC failure, serve a stale cache
+    // (up to 30 min old) rather than propagating the error. Fresh events
+    // aren't worth taking the route down over.
+    if (cache && Date.now() - cache.ts < STALE_MAX_MS) {
+      console.warn(`[on-chain-fetcher] serving stale cache (${Date.now() - cache.ts}ms old) after RPC failure:`, (err as Error).message);
+      return cache.rows;
+    }
     console.error(`[on-chain-fetcher] RPC failed after ${Date.now() - t0}ms:`, err);
     throw err;
   }
