@@ -18,7 +18,7 @@
  */
 import {
   type Connection,
-  type PublicKey,
+  PublicKey,
   Keypair,
   Transaction,
   SystemProgram,
