@@ -48,10 +48,13 @@ async function getUploader(): Promise<any | null> {
     const { Uploader } = (await import("@irys/upload")) as any;
     const { Solana } = (await import("@irys/upload-solana")) as any;
     const isDevnet = (env.SOLANA_RPC_URL || "").includes("devnet");
-    const uploader = await Uploader(Solana)
+    // Build in a single chain: .devnet() targets Irys's devnet bundler
+    // which accepts devnet SOL payments. Mainnet paths need real SOL.
+    let builder = Uploader(Solana)
       .withWallet(secretKey)
       .withRpc(env.SOLANA_RPC_URL || "https://api.devnet.solana.com");
-    if (isDevnet) (uploader as any).withRpc?.(env.SOLANA_RPC_URL).devnet?.();
+    if (isDevnet) builder = builder.devnet();
+    const uploader = await builder;
     cachedUploader = uploader;
     return uploader;
   } catch (err) {
