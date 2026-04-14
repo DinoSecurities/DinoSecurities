@@ -14,8 +14,6 @@
   <a href="#getting-started">Getting Started</a>
 </p>
 
-> ⚠️ **Protocol is experimental beta software. Use at your own risk. Not investment advice. See [TERMS.md](TERMS.md).** Operators do not act as broker-dealer, ATS, transfer agent, or offering facilitator. Users are solely responsible for ensuring their own use of the protocol complies with applicable law in their jurisdiction.
-
 ---
 
 ## Overview
@@ -291,7 +289,11 @@ The backend exposes a type-safe tRPC API with the following routers:
 
 ## License
 
-All rights reserved. See [LICENSE](LICENSE) for details.
+Apache License 2.0. See [LICENSE](LICENSE) for details.
+
+---
+
+> ⚠️ **Protocol is experimental beta software. Use at your own risk. Not investment advice. See [TERMS.md](TERMS.md).** Operators do not act as broker-dealer, ATS, transfer agent, or offering facilitator. Users are solely responsible for ensuring their own use of the protocol complies with applicable law in their jurisdiction.
 
 ---
 

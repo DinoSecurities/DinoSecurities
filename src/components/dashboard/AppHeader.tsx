@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import WalletButton from "@/components/wallet/WalletButton";
 import NetworkBadge from "@/components/wallet/NetworkBadge";
+import BetaBanner from "./BetaBanner";
 
 const mobileNav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -59,20 +60,7 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
 
   return (
     <>
-      <div className="w-full bg-amber-500/10 border-b border-amber-500/20 px-4 md:px-6 py-2 flex items-center justify-center text-[10px] uppercase tracking-widest text-amber-300/90 font-semibold gap-2 text-center">
-        <Shield size={12} />
-        <span>
-          Experimental beta — protocol is unaudited. Not investment advice. Use at your own risk.{" "}
-          <a
-            href="https://github.com/DinoSecurities/DinoSecurities/blob/main/TERMS.md"
-            target="_blank"
-            rel="noreferrer"
-            className="underline hover:text-amber-200 normal-case tracking-normal"
-          >
-            Terms
-          </a>
-        </span>
-      </div>
+      <BetaBanner />
       <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 shrink-0 relative z-40">
         <div className="flex items-center gap-4">
           <button onClick={() => setMobileOpen(true)} className="md:hidden text-muted-foreground hover:text-foreground">
