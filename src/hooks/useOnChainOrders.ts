@@ -27,8 +27,10 @@ const ORDER_DISCRIMINATOR: Buffer = (() => {
 
 function decode(data: Buffer): OnChainOrder | null {
   const d: any = coder.decode("SettlementOrder", data);
-  const sideKey = Object.keys(d.side ?? {})[0] ?? "buy";
-  const statusKey = Object.keys(d.status ?? {})[0] ?? "open";
+  // Anchor 0.32 preserves Rust enum variant case ("Open", "Buy", "Sell").
+  // Lowercase before comparing so renderers don't miss legitimate orders.
+  const sideKey = (Object.keys(d.side ?? {})[0] ?? "buy").toLowerCase();
+  const statusKey = (Object.keys(d.status ?? {})[0] ?? "open").toLowerCase();
   return {
     pda: "", // filled by caller
     creator: d.creator.toBase58(),

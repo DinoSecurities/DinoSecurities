@@ -108,14 +108,17 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
   for (const { pubkey, account } of accounts) {
     try {
       const d: any = accountsCoder.decode("SettlementOrder", account.data);
-      const statusKey = Object.keys(d.status ?? {})[0] ?? "open";
+      // Anchor 0.32 emits enum variant keys in the original Rust case
+      // ("Open" / "Buy" / "Sell"), not lowercase. Normalise for both.
+      const statusKey = (Object.keys(d.status ?? {})[0] ?? "").toLowerCase();
       if (statusKey !== "open") continue;
       const expiresAt = Number(d.expires_at ?? d.expiresAt ?? 0);
       if (expiresAt <= now) continue;
+      const sideKey = (Object.keys(d.side)[0] ?? "").toLowerCase();
       out.push({
         pda: pubkey,
         creator: d.creator,
-        side: Object.keys(d.side)[0] === "sell" ? "Sell" : "Buy",
+        side: sideKey === "sell" ? "Sell" : "Buy",
         securityMint: d.security_mint ?? d.securityMint,
         paymentMint: d.payment_mint ?? d.paymentMint,
         tokenAmount: BigInt(d.token_amount?.toString() ?? d.tokenAmount?.toString() ?? "0"),
