@@ -263,7 +263,7 @@ export async function createSecuritySeriesOnChain(
     const res = await fetch(registerUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ tx: serialized }),
+      body: JSON.stringify({ signedTxBase64: serialized }),
     });
     if (!res.ok) {
       const text = await res.text();
