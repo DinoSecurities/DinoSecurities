@@ -37,4 +37,24 @@ export default defineConfig(({ mode }) => ({
       "buffer",
     ],
   },
+  build: {
+    // The Solana + wallet-adapter + recharts stack is bulky. Split into
+    // coarse-grained vendor chunks so the app shell stays < 500 kB and
+    // heavy dependencies only load when their pages are visited. Anything
+    // we don't name explicitly falls into the default app chunk.
+    chunkSizeWarningLimit: 800,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes("node_modules")) {
+            if (id.includes("@solana/") || id.includes("@coral-xyz/anchor")) return "solana";
+            if (id.includes("@solana/wallet-adapter") || id.includes("@reown") || id.includes("@walletconnect")) return "wallet";
+            if (id.includes("recharts") || id.includes("d3-")) return "charts";
+            if (id.includes("@radix-ui")) return "radix";
+            if (id.includes("react-router")) return "router";
+          }
+        },
+      },
+    },
+  },
 }));
