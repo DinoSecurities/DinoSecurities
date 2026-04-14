@@ -94,10 +94,10 @@ const HeroSection = () => {
           transition={{ duration: 1.2, ease: [0.16, 1, 0.3, 1] }}
         >
           <span className="font-medium text-transparent bg-clip-text bg-gradient-to-br from-foreground to-muted-foreground">
-            Tokenized
+            Compliance-Aware
           </span>
           <br className="hidden sm:block" />
-          <span className="text-foreground"> Securities.</span>
+          <span className="text-foreground"> Token Infrastructure.</span>
           <br />
           <span className="text-muted-foreground">On Solana.</span>
         </motion.h1>
@@ -108,8 +108,9 @@ const HeroSection = () => {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.3 }}
         >
-          Issue, manage, trade, and govern legally enforceable security tokens with on-chain compliance,
-          atomic settlement, and full DeFi composability.
+          Open-source protocol for minting Token-2022 assets with on-chain transfer-hook
+          enforcement, atomic delivery-vs-payment settlement, and per-mint DAO governance.
+          Infrastructure, not an issuer.
         </motion.p>
 
         <motion.div

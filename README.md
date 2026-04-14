@@ -5,7 +5,7 @@
 <h1 align="center">DinoSecurities</h1>
 
 <p align="center">
-  <strong>Solana-native tokenized securities platform with on-chain compliance, atomic settlement, and DAO governance.</strong>
+  <strong>Open-source Solana infrastructure for compliance-aware token transfers — Token-2022 transfer hooks, whitelist-gated ATAs, atomic DvP, on-chain governance.</strong>
 </p>
 
 <p align="center">
@@ -14,25 +14,33 @@
   <a href="#getting-started">Getting Started</a>
 </p>
 
+> ⚠️ **Protocol is experimental beta software. Use at your own risk. Not investment advice. See [TERMS.md](TERMS.md).** Operators do not act as broker-dealer, ATS, transfer agent, or offering facilitator. Users are solely responsible for ensuring their own use of the protocol complies with applicable law in their jurisdiction.
+
 ---
 
 ## Overview
 
-DinoSecurities is a full-stack platform for issuing, managing, trading, and governing legally enforceable security tokens on the Solana blockchain. Every token is cryptographically linked to its governing legal document via SHA-256 hash (Ricardian Contract principle), with compliance logic enforced at the token level through Token-2022 transfer hooks.
+DinoSecurities is an **open-source protocol** for building compliance-aware token workflows on Solana. It gives developers and DAOs a set of composable on-chain programs + reference UI for:
 
-The platform supports real equity, debt, fund interests, and LLC memberships — not just NFTs or utility tokens — with regulatory transfer restrictions (Reg D, Reg S, Reg CF, Reg A+) enforced on every transfer.
+- Minting **Token-2022** tokens whose every transfer is gated by an on-chain Transfer Hook
+- Maintaining per-token allowlists (`HolderRecord` PDAs) that gate which wallets can receive transfers
+- Swapping those tokens for payment tokens atomically (**DvP**) without a trusted escrow
+- Per-mint DAO governance (`Realm` / `Proposal` / `Vote` accounts) with token-weighted voting
+
+The transfer hook's validation logic — KYC recency, accreditation flag, freeze status, jurisdiction — is **general-purpose**. Whether you use the hook to enforce a private allowlist, a compliance regime, a membership DAO, or something else entirely is up to the deployer. The protocol doesn't care.
+
+**The protocol is infrastructure. It is not itself a securities issuance platform, broker-dealer, ATS, or transfer agent.** If you are using it to tokenize regulated financial instruments, consult securities counsel in the relevant jurisdiction(s). The reference UI includes inputs (legal doc hash, jurisdiction, restriction code) that *can* support that use case — they are not a claim that any particular issuance is compliant with any particular law.
 
 ## Key Features
 
-- **Solana Wallet Authentication** — Phantom & Solflare integration, no traditional accounts
-- **Token-2022 Securities** — Mint with Transfer Hook, Default Frozen, Metadata Pointer, and Permanent Delegate extensions
-- **Atomic DvP Settlement** — Delivery vs Payment in a single Solana transaction (<1s, <$0.01)
-- **On-Chain Compliance** — Transfer hook validates KYC, accreditation, freeze status, and regulation rules on every transfer
-- **DAO Governance** — Token-weighted voting per security series via SPL Governance (Realms)
-- **KYC/AML Integration** — Off-chain KYC oracle with on-chain HolderRecord PDAs
-- **Issuer Portal** — Multi-step wizard to create security series with legal document upload
-- **Arweave Storage** — Permanent legal document storage with SHA-256 hash verification
-- **IPFS Metadata** — Token metadata pinned via Pinata
+- **Solana Wallet Authentication** — Phantom & Solflare, no passwords
+- **Token-2022 with extensions** — Transfer Hook + Metadata Pointer + Permanent Delegate pre-wired
+- **Atomic DvP Settlement** — Payment + asset legs in a single transaction (<1s, <$0.01)
+- **Transfer Hook enforcement** — Configurable per-mint allowlist, accreditation flag, freeze, jurisdiction
+- **Per-mint DAO governance** — Realm + token-weighted voting + proposal timelock
+- **Optional KYC pipeline** — Didit (or any provider via the `KYCProvider` interface) with on-chain `HolderRecord` PDAs
+- **Issuer Portal** — Reference UI wizard for deploying a new series end-to-end
+- **Permanent document storage** — SHA-256-pinned uploads to Arweave via Irys
 - **Real-Time Indexing** — Helius webhooks capture on-chain events into PostgreSQL
 
 ## Tech Stack

@@ -29,10 +29,10 @@ const AboutSection = () => (
           </h2>
 
           <p className="text-sm md:text-base text-muted-foreground max-w-2xl leading-relaxed">
-            DinoSecurities is a Solana-native tokenized securities platform that enables the issuance,
-            management, trading, and governance of legally enforceable security tokens. Tokens represent
-            real equity, debt, fund interests, or LLC memberships — with compliance logic baked into
-            the token layer itself.
+            DinoSecurities is an open-source Solana protocol for minting Token-2022 assets with
+            enforceable on-chain allowlists, atomic delivery-vs-payment settlement, and per-mint
+            DAO governance. It is infrastructure — a toolkit, not an issuer or a marketplace
+            operator. How you use the hook's compliance primitives is up to you and your counsel.
           </p>
         </motion.div>
       </div>
@@ -42,18 +42,18 @@ const AboutSection = () => (
         {[
           {
             icon: Link2,
-            title: "Ricardian Contracts",
-            desc: "Every token is cryptographically linked to its governing legal document via SHA-256 hash stored immutably on-chain. The act of minting constitutes acceptance of the document's terms.",
+            title: "Ricardian Linking",
+            desc: "Every mint records a SHA-256 hash of an optional governing document. If the deployer hashes a real contract, the token is cryptographically bound to it; if not, the slot stays empty. The protocol doesn't interpret what's at the hash.",
           },
           {
             icon: Shield,
-            title: "On-Chain Compliance",
-            desc: "Transfer restrictions for Reg D, Reg S, Reg CF, and Reg A+ are enforced at the token level via Solana's Token-2022 transfer hooks — not backend middleware.",
+            title: "Transfer-Hook Enforcement",
+            desc: "A Token-2022 transfer hook runs inside every transfer and validates the recipient against per-mint allowlists (HolderRecord PDAs). Accreditation flag, freeze status, jurisdiction, and KYC expiry are all configurable per series.",
           },
           {
             icon: Scale,
-            title: "Legal Enforceability",
-            desc: "Inheriting from LexDAO's Ricardian LLC on Ethereum, every security token is simultaneously a legal instrument and a programmable digital asset.",
+            title: "Permissionless Primitives",
+            desc: "Anyone can deploy their own mint + hook config. The operator of the reference UI is not the issuer of whatever tokens users create with it. Users are responsible for their own compliance.",
           },
         ].map((item, i) => (
           <motion.div
