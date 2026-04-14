@@ -16,6 +16,13 @@ const envSchema = z.object({
   KYC_WEBHOOK_SECRET: z.string().optional(),
   KYC_REDIRECT_URL: z.string().default("https://www.dinosecurities.com/app/settings?kyc=callback"),
   SETTLEMENT_AGENT_KEY: z.string().optional(),
+  /**
+   * KYC oracle keypair — co-signs register_issuer and register_holder
+   * instructions. Must match platform.kyc_oracle as configured at
+   * initialize_platform. Accepts a JSON byte-array, a filesystem path
+   * to a Solana keypair JSON, or a base58 secret key string.
+   */
+  KYC_ORACLE_KEY: z.string().optional(),
   IRYS_WALLET_KEY: z.string().optional(),
   PINATA_API_KEY: z.string().optional(),
   PINATA_SECRET_KEY: z.string().optional(),

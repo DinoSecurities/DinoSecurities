@@ -10,6 +10,7 @@ import { heliusWebhookHandler } from "./webhooks/helius.js";
 import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
 import { uploadDocument } from "./services/arweave.js";
 import { startSettlementAgent, runMatchingTick } from "./services/settlement-agent.js";
+import { cosignAndSubmit, getOraclePubkey } from "./services/oracle-signer.js";
 import { env } from "./env.js";
 
 const app = express();
@@ -102,6 +103,41 @@ app.use("/trpc", apiLimiter, createExpressMiddleware({
   router: appRouter,
   createContext,
 }));
+
+// KYC oracle co-signing endpoints. Client partial-signs a tx containing
+// exactly one register_issuer / register_holder call, posts it here, we
+// co-sign with the oracle keypair and submit.
+const coSignLimiter = rateLimit({ windowMs: 60_000, limit: 30 });
+app.get("/oracle-pubkey", (_req, res) => {
+  const pk = getOraclePubkey();
+  res.json({ pubkey: pk?.toBase58() ?? null });
+});
+app.post("/register-issuer", coSignLimiter, async (req, res) => {
+  try {
+    const { signedTxBase64 } = req.body ?? {};
+    if (typeof signedTxBase64 !== "string") {
+      return res.status(400).json({ error: "signedTxBase64 required" });
+    }
+    const result = await cosignAndSubmit(signedTxBase64, "register_issuer");
+    res.json(result);
+  } catch (err: any) {
+    console.error("[register-issuer] failed:", err?.message ?? err);
+    res.status(400).json({ error: err?.message ?? "co-sign failed" });
+  }
+});
+app.post("/register-holder", coSignLimiter, async (req, res) => {
+  try {
+    const { signedTxBase64 } = req.body ?? {};
+    if (typeof signedTxBase64 !== "string") {
+      return res.status(400).json({ error: "signedTxBase64 required" });
+    }
+    const result = await cosignAndSubmit(signedTxBase64, "register_holder");
+    res.json(result);
+  } catch (err: any) {
+    console.error("[register-holder] failed:", err?.message ?? err);
+    res.status(400).json({ error: err?.message ?? "co-sign failed" });
+  }
+});
 
 // Admin endpoint to trigger a matching tick on demand — useful for testing
 // and for operators who want to kick the queue without waiting 30s.
