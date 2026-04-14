@@ -1,11 +1,22 @@
 import { motion } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { CheckCheck, ArrowRight } from "lucide-react";
+import { CheckCheck, ArrowRight, Copy, Check } from "lucide-react";
+import { toast } from "sonner";
+
+const CONTRACT_ADDRESS = "XXXX";
 
 const HeroSection = () => {
   const bgRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCA = () => {
+    navigator.clipboard.writeText(CONTRACT_ADDRESS);
+    setCopied(true);
+    toast.success("Contract address copied!");
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   useEffect(() => {
     const container = bgRef.current;
@@ -92,7 +103,7 @@ const HeroSection = () => {
         </motion.h1>
 
         <motion.p
-          className="mb-10 max-w-2xl text-center text-base leading-relaxed text-muted-foreground md:text-lg text-balance"
+          className="mb-10 max-w-2xl text-center text-base leading-relaxed text-white md:text-lg text-balance"
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 1, delay: 0.3 }}
@@ -125,6 +136,22 @@ const HeroSection = () => {
             Read Documentation
           </button>
         </motion.div>
+
+        <motion.button
+          onClick={handleCopyCA}
+          className="mt-6 inline-flex items-center gap-2 text-xs font-mono tracking-widest text-muted-foreground hover:text-foreground transition-colors px-4 py-2 rounded-full border border-border hover:border-primary/40 cursor-pointer"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 1, delay: 0.7 }}
+        >
+          <span className="uppercase">CA:</span>
+          <span className="text-foreground">{CONTRACT_ADDRESS}</span>
+          {copied ? (
+            <Check size={12} className="text-emerald-400" />
+          ) : (
+            <Copy size={12} className="text-muted-foreground" />
+          )}
+        </motion.button>
       </div>
     </section>
   );
