@@ -9,7 +9,7 @@ import { createContext } from "./context.js";
 import { heliusWebhookHandler } from "./webhooks/helius.js";
 import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
 import { uploadDocument } from "./services/arweave.js";
-import { startSettlementAgent, runMatchingTick } from "./services/settlement-agent.js";
+import { startSettlementAgent, runMatchingTick, debugFetch } from "./services/settlement-agent.js";
 import { cosignAndSubmit, getOraclePubkey } from "./services/oracle-signer.js";
 import { env } from "./env.js";
 
@@ -114,6 +114,13 @@ app.get("/oracle-pubkey", (_req, res) => {
 });
 // Plain-text diagnostic: which RPC, which program ID, which agent.
 // Exposed without auth because it leaks no secrets — all values are public.
+app.get("/agent-debug-fetch", async (_req, res) => {
+  try {
+    res.json(await debugFetch());
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "debug-fetch failed" });
+  }
+});
 app.get("/agent-info", (_req, res) => {
   res.json({
     program: env.DINO_CORE_PROGRAM_ID,

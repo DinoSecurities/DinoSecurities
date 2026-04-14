@@ -304,6 +304,54 @@ export async function runMatchingTick(): Promise<{
 }
 
 /**
+ * Raw RPC probe for diagnostics. Returns the total number of accounts
+ * owned by dino_core AND the number matching the SettlementOrder
+ * discriminator filter, so we can see whether a 0 result is because the
+ * program has no orders or because the filter is dropping them.
+ */
+export async function debugFetch(): Promise<{
+  rpc: string;
+  program: string;
+  discriminatorB58: string;
+  totalAccountsUnfiltered: number | string;
+  totalAccountsFiltered: number | string;
+  sample: Array<{ pubkey: string; dataLen: number; firstBytes: string }>;
+}> {
+  const out: any = {
+    rpc: RPC_URL,
+    program: programId.toBase58(),
+    discriminatorB58: bs58.encode(ORDER_DISCRIMINATOR),
+    totalAccountsUnfiltered: "?",
+    totalAccountsFiltered: "?",
+    sample: [],
+  };
+  try {
+    const unfiltered = await connection.getProgramAccounts(programId, {
+      commitment: "confirmed",
+      dataSlice: { offset: 0, length: 16 }, // cheap — just the discriminator
+    });
+    out.totalAccountsUnfiltered = unfiltered.length;
+    out.sample = unfiltered.slice(0, 5).map((a) => ({
+      pubkey: a.pubkey.toBase58(),
+      dataLen: a.account.data.length,
+      firstBytes: Buffer.from(a.account.data).slice(0, 8).toString("hex"),
+    }));
+  } catch (e: any) {
+    out.totalAccountsUnfiltered = `error: ${e?.message ?? e}`;
+  }
+  try {
+    const filtered = await connection.getProgramAccounts(programId, {
+      commitment: "confirmed",
+      filters: [{ memcmp: { offset: 0, bytes: bs58.encode(ORDER_DISCRIMINATOR) } }],
+    });
+    out.totalAccountsFiltered = filtered.length;
+  } catch (e: any) {
+    out.totalAccountsFiltered = `error: ${e?.message ?? e}`;
+  }
+  return out;
+}
+
+/**
  * Start the background matching loop. Polls every 30s. Safe to call once
  * from the server entrypoint — idempotent if the agent key isn't configured
  * (it'll just no-op each tick).
