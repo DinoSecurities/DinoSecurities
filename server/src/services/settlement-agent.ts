@@ -39,8 +39,13 @@ const ORDER_DISCRIMINATOR: Buffer = (() => {
   return Buffer.from(acct?.discriminator ?? []);
 })();
 
-const RPC_URL = env.SOLANA_RPC_FALLBACK || env.SOLANA_RPC_URL || "https://api.devnet.solana.com";
+// Helius free tier blocks getProgramAccounts, so we force the public
+// devnet RPC for order scans regardless of env. Matches the on-chain-
+// fetcher's policy. Mainnet will need a paid-plan RPC that permits
+// scans; set SOLANA_RPC_FALLBACK to that when the time comes.
+const RPC_URL = env.SOLANA_RPC_FALLBACK || "https://api.devnet.solana.com";
 const connection = new Connection(RPC_URL, "confirmed");
+console.log(`[settlement-agent] RPC = ${RPC_URL}`);
 const programId = new PublicKey(env.DINO_CORE_PROGRAM_ID);
 const hookProgramId = new PublicKey(env.DINO_HOOK_PROGRAM_ID);
 

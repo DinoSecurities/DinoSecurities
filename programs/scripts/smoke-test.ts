@@ -407,14 +407,28 @@ async function main() {
   log("order", `buy  ${buyOrderPda.toBase58().slice(0, 8)}..`);
 
   // --- trigger the matching loop --------------------------------------------
-  log("match", "calling backend /admin/run-matching");
-  const res = await fetch(`${BACKEND_URL}/admin/run-matching`, {
-    method: "POST",
-    headers: { authorization: MATCHING_SECRET },
-  });
-  if (!res.ok) fail("match", `backend returned ${res.status}: ${await res.text()}`);
-  const matchResult = await res.json();
-  log("match", `backend: ${JSON.stringify(matchResult)}`);
+  // Devnet RPC lags a few seconds between tx confirm and getProgramAccounts
+  // visibility. Retry matching up to 6 times with growing delay so we
+  // don't declare failure over a ~10-15s indexing race.
+  log("match", "waiting 4s for devnet RPC to index orders");
+  await new Promise((r) => setTimeout(r, 4000));
+
+  let matchResult: any = null;
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const res = await fetch(`${BACKEND_URL}/admin/run-matching`, {
+      method: "POST",
+      headers: { authorization: MATCHING_SECRET },
+    });
+    if (!res.ok) fail("match", `backend returned ${res.status}: ${await res.text()}`);
+    matchResult = await res.json();
+    log("match", `attempt ${attempt}: ${JSON.stringify(matchResult)}`);
+    if (matchResult.settled > 0) break;
+    if (matchResult.openOrders >= 2 && matchResult.matched === 0) {
+      log("match", "orders visible but not matched — see DO logs for shape mismatch");
+      break;
+    }
+    await new Promise((r) => setTimeout(r, 4000 * attempt));
+  }
 
   // --- verify both orders settled ------------------------------------------
   await new Promise((r) => setTimeout(r, 2000));
