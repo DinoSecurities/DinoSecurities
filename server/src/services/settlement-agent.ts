@@ -105,15 +105,17 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
   console.log(`[settlement-agent] RPC returned ${accounts.length} raw accounts`);
   const now = Math.floor(Date.now() / 1000);
   const out: OpenOrder[] = [];
+  let decoded = 0, dropped = 0;
   for (const { pubkey, account } of accounts) {
     try {
       const d: any = accountsCoder.decode("SettlementOrder", account.data);
+      decoded++;
       // Anchor 0.32 emits enum variant keys in the original Rust case
       // ("Open" / "Buy" / "Sell"), not lowercase. Normalise for both.
       const statusKey = (Object.keys(d.status ?? {})[0] ?? "").toLowerCase();
-      if (statusKey !== "open") continue;
       const expiresAt = Number(d.expires_at ?? d.expiresAt ?? 0);
-      if (expiresAt <= now) continue;
+      if (statusKey !== "open") { dropped++; continue; }
+      if (expiresAt <= now) { dropped++; continue; }
       const sideKey = (Object.keys(d.side)[0] ?? "").toLowerCase();
       out.push({
         pda: pubkey,
@@ -126,10 +128,12 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
         expiresAt,
         nonce: new anchor.BN(d.nonce.toString()),
       });
-    } catch {
-      // skip un-decodeable accounts
+    } catch (err) {
+      // skip un-decodeable accounts but track them
+      dropped++;
     }
   }
+  console.log(`[settlement-agent] fetchOpenOrders: ${accounts.length} raw -> ${decoded} decoded -> ${out.length} open (${dropped} dropped)`);
   return out;
 }
 
@@ -348,6 +352,20 @@ export async function debugFetch(): Promise<{
       filters: [{ memcmp: { offset: 0, bytes: bs58.encode(ORDER_DISCRIMINATOR) } }],
     });
     out.totalAccountsFiltered = filtered.length;
+    // Decode the first few so we can see exactly what status + side look like
+    out.decodedSample = filtered.slice(0, 5).map((a) => {
+      try {
+        const d: any = accountsCoder.decode("SettlementOrder", a.account.data);
+        return {
+          pda: a.pubkey.toBase58(),
+          statusKey: Object.keys(d.status ?? {})[0],
+          sideKey: Object.keys(d.side ?? {})[0],
+          expiresAt: Number(d.expires_at ?? d.expiresAt ?? 0),
+        };
+      } catch (e: any) {
+        return { pda: a.pubkey.toBase58(), error: String(e?.message ?? e) };
+      }
+    });
   } catch (e: any) {
     out.totalAccountsFiltered = `error: ${e?.message ?? e}`;
   }
