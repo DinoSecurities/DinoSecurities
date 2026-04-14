@@ -91,6 +91,10 @@ interface OpenOrder {
   nonce: anchor.BN;
 }
 
+let lastFetchBreakdown = { raw: 0, decoded: 0, open: 0, dropped: 0 };
+
+export function getLastFetchBreakdown() { return lastFetchBreakdown; }
+
 async function fetchOpenOrders(): Promise<OpenOrder[]> {
   if (ORDER_DISCRIMINATOR.length !== 8) {
     console.warn(`[settlement-agent] ORDER_DISCRIMINATOR.length = ${ORDER_DISCRIMINATOR.length} — IDL not loaded correctly`);
@@ -133,6 +137,7 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
       dropped++;
     }
   }
+  lastFetchBreakdown = { raw: accounts.length, decoded, open: out.length, dropped };
   console.log(`[settlement-agent] fetchOpenOrders: ${accounts.length} raw -> ${decoded} decoded -> ${out.length} open (${dropped} dropped)`);
   return out;
 }

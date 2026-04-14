@@ -9,7 +9,7 @@ import { createContext } from "./context.js";
 import { heliusWebhookHandler } from "./webhooks/helius.js";
 import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
 import { uploadDocument } from "./services/arweave.js";
-import { startSettlementAgent, runMatchingTick, debugFetch } from "./services/settlement-agent.js";
+import { startSettlementAgent, runMatchingTick, debugFetch, getLastFetchBreakdown } from "./services/settlement-agent.js";
 import { cosignAndSubmit, getOraclePubkey } from "./services/oracle-signer.js";
 import { env } from "./env.js";
 
@@ -167,7 +167,7 @@ app.post("/admin/run-matching", async (req, res) => {
   }
   try {
     const result = await runMatchingTick();
-    res.json(result);
+    res.json({ ...result, breakdown: getLastFetchBreakdown() });
   } catch (err: any) {
     res.status(500).json({ error: err?.message ?? "tick failed" });
   }
