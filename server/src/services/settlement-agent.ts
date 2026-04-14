@@ -246,15 +246,38 @@ async function executeMatch(
  * One tick of the matching loop: fetch open orders, find matches, execute
  * each one. Returns the number of successful settlements.
  */
-export async function runMatchingTick(): Promise<{ matched: number; settled: number; errors: number }> {
+export async function runMatchingTick(): Promise<{
+  matched: number;
+  settled: number;
+  errors: number;
+  agentLoaded: boolean;
+  openOrders: number;
+}> {
   const agent = loadAgent();
-  if (!agent) return { matched: 0, settled: 0, errors: 0 };
+  if (!agent) {
+    console.warn("[settlement-agent] tick skipped — SETTLEMENT_AGENT_KEY not configured");
+    return { matched: 0, settled: 0, errors: 0, agentLoaded: false, openOrders: 0 };
+  }
   const program = programFor(agent);
   const orders = await fetchOpenOrders();
   const matches = findMatches(orders);
-  if (matches.length === 0) return { matched: 0, settled: 0, errors: 0 };
+  console.log(
+    `[settlement-agent] tick: ${orders.length} open orders, ${matches.length} matchable (agent=${agent.publicKey.toBase58().slice(0, 8)}..)`,
+  );
+  if (matches.length === 0) {
+    if (orders.length >= 2) {
+      // We saw orders but couldn't pair them. Log a shape sample so
+      // operators can see why — common reasons: mint mismatch, amount
+      // mismatch, or same creator on both sides.
+      for (const o of orders.slice(0, 4)) {
+        console.log(
+          `  order ${o.pda.toBase58().slice(0, 8)}.. side=${o.side} mint=${o.securityMint.toBase58().slice(0, 8)}.. tok=${o.tokenAmount} pay=${o.paymentAmount} creator=${o.creator.toBase58().slice(0, 8)}..`,
+        );
+      }
+    }
+    return { matched: 0, settled: 0, errors: 0, agentLoaded: true, openOrders: orders.length };
+  }
 
-  console.log(`[settlement-agent] ${orders.length} open orders, ${matches.length} matchable`);
   let settled = 0, errors = 0;
   for (const m of matches) {
     try {
@@ -266,7 +289,7 @@ export async function runMatchingTick(): Promise<{ matched: number; settled: num
       errors++;
     }
   }
-  return { matched: matches.length, settled, errors };
+  return { matched: matches.length, settled, errors, agentLoaded: true, openOrders: orders.length };
 }
 
 /**
