@@ -149,7 +149,10 @@ async function fetchOpenOrders(): Promise<OpenOrder[]> {
         tokenAmount: BigInt(d.token_amount?.toString() ?? d.tokenAmount?.toString() ?? "0"),
         paymentAmount: BigInt(d.payment_amount?.toString() ?? d.paymentAmount?.toString() ?? "0"),
         expiresAt,
-        nonce: new anchor.BN(d.nonce.toString()),
+        // d.nonce is already a BN instance from the BorshAccountsCoder —
+        // no need to reconstruct. `new anchor.BN(...)` was throwing
+        // "not a constructor" under ESM interop anyway.
+        nonce: d.nonce,
       });
     } catch (err) {
       // skip un-decodeable accounts but track them
