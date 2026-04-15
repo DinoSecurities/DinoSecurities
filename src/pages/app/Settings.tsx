@@ -105,7 +105,29 @@ const Settings = () => {
                   </button>
                 )}
                 {kycStatus.data?.status === "pending" && (
-                  <p className="text-[10px] text-muted-foreground mt-3">Verification in progress — refresh after completing in Didit.</p>
+                  <>
+                    <p className="text-[10px] text-muted-foreground mt-3">
+                      Verification in progress. If your Didit tab is still open, finish there and come back.
+                    </p>
+                    <button
+                      onClick={() => startKyc.mutate()}
+                      disabled={startKyc.isPending || !wallet}
+                      className="mt-3 w-full flex items-center justify-center gap-2 px-4 py-2 border border-primary/50 text-primary text-[10px] uppercase tracking-widest font-semibold disabled:opacity-50 hover:bg-primary/10 transition-colors"
+                    >
+                      {startKyc.isPending ? <Loader2 size={12} className="animate-spin" /> : <ExternalLink size={12} />}
+                      Restart verification
+                    </button>
+                  </>
+                )}
+                {(kycStatus.data?.status === "rejected" || kycStatus.data?.status === "revoked" || kycStatus.data?.status === "expired") && (
+                  <button
+                    onClick={() => startKyc.mutate()}
+                    disabled={startKyc.isPending || !wallet}
+                    className="mt-4 w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-primary text-primary-foreground text-xs uppercase tracking-widest font-semibold disabled:opacity-50 hover:bg-primary/90 transition-colors"
+                  >
+                    {startKyc.isPending ? <Loader2 size={14} className="animate-spin" /> : <ExternalLink size={14} />}
+                    Retry verification
+                  </button>
                 )}
               </>
             )}

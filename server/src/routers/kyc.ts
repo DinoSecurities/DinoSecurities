@@ -39,8 +39,25 @@ export const kycRouter = router({
         .orderBy(desc(kycSessions.createdAt))
         .limit(1);
       if (!latest) return { status: "none" as const, session: null };
+
+      // Auto-expire pending sessions that haven't been resolved within an
+      // hour. Didit sessions have their own TTL; if no webhook has landed
+      // by then, the user either abandoned the flow or the webhook is
+      // misconfigured. Surfacing "expired" lets the UI show a retry button.
+      let effectiveStatus = latest.status;
+      if (latest.status === "pending") {
+        const createdAt = latest.createdAt ? new Date(latest.createdAt).getTime() : 0;
+        if (Date.now() - createdAt > 60 * 60 * 1000) {
+          effectiveStatus = "expired";
+          await ctx.db
+            .update(kycSessions)
+            .set({ status: "expired" })
+            .where(eq(kycSessions.id, latest.id));
+        }
+      }
+
       return {
-        status: latest.status as "pending" | "verified" | "expired" | "revoked" | "none",
+        status: effectiveStatus as "pending" | "verified" | "expired" | "revoked" | "none",
         session: latest,
       };
     }),

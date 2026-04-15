@@ -62,8 +62,10 @@ app.post("/webhooks/kyc", webhookLimiter, async (req, res) => {
   try {
     const raw = (req.body as Buffer).toString("utf8");
     const signature = String(req.header("x-didit-signature") ?? req.header("x-signature") ?? "");
+    console.log(`[kyc-webhook] received ${raw.length} bytes, sig=${signature.slice(0, 16)}...`);
     const provider = getKYCProvider();
     if (!provider.verifyWebhookSignature(raw, signature)) {
+      console.warn("[kyc-webhook] signature verification FAILED");
       return res.status(401).json({ error: "invalid signature" });
     }
     const payload = JSON.parse(raw);
