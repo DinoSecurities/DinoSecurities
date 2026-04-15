@@ -13,13 +13,13 @@ import {
 import WalletStatus from "@/components/wallet/WalletStatus";
 
 const navItems = [
-  { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
-  { to: "/app/portfolio", label: "Portfolio", icon: Briefcase },
-  { to: "/app/marketplace", label: "Marketplace", icon: Store },
-  { to: "/app/governance", label: "Governance", icon: Vote },
-  { to: "/app/settlement", label: "Settlement", icon: ArrowLeftRight },
-  { to: "/app/issue", label: "Issuer Portal", icon: FileStack },
-  { to: "/app/settings", label: "Settings", icon: Settings },
+  { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true, disabled: false },
+  { to: "/app/portfolio", label: "Portfolio", icon: Briefcase, disabled: false },
+  { to: "/app/marketplace", label: "Marketplace", icon: Store, disabled: false },
+  { to: "/app/governance", label: "Governance", icon: Vote, disabled: true },
+  { to: "/app/settlement", label: "Settlement", icon: ArrowLeftRight, disabled: false },
+  { to: "/app/issue", label: "Issuer Portal", icon: FileStack, disabled: false },
+  { to: "/app/settings", label: "Settings", icon: Settings, disabled: false },
 ];
 
 interface Props {
@@ -56,6 +56,24 @@ const AppSidebar = ({ collapsed, onToggle }: Props) => {
           const isActive = item.end
             ? location.pathname === item.to
             : location.pathname.startsWith(item.to);
+
+          if (item.disabled) {
+            return (
+              <div
+                key={item.to}
+                title="Coming soon"
+                className="flex items-center gap-3 px-3 py-2.5 text-sm border-l-2 border-transparent ml-0 pl-[10px] text-muted-foreground/40 cursor-not-allowed"
+              >
+                <item.icon size={18} className="shrink-0" />
+                {!collapsed && (
+                  <div className="flex items-center gap-2 truncate">
+                    <span className="truncate">{item.label}</span>
+                    <span className="text-[8px] uppercase tracking-widest bg-muted/30 border border-border px-1.5 py-0.5 text-muted-foreground/60">Soon</span>
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return (
             <NavLink
