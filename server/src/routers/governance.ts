@@ -1,39 +1,84 @@
 import { z } from "zod";
+import { eq, and, desc } from "drizzle-orm";
 import { router, publicProcedure } from "../trpc.js";
-
-// Governance data is primarily on-chain via SPL Governance (Realms).
-// This router provides indexed/cached access for faster queries.
-// Until webhooks populate the DB, these fall back to empty results.
+import { govRealms, govProposals, govVotes } from "../db/schema.js";
+import { fetchRealmOnChain, fetchProposalsOnChain } from "../services/governance-fetcher.js";
 
 export const governanceRouter = router({
-  getProposals: publicProcedure
-    .input(
-      z.object({
-        realm: z.string().optional(),
-        status: z.enum(["active", "passed", "rejected", "pending", "executed"]).optional(),
-      }).optional(),
-    )
+  getRealm: publicProcedure
+    .input(z.object({ mint: z.string() }))
     .query(async ({ ctx, input }) => {
-      // TODO: Query from indexed governance data once webhooks populate it
-      // For now, governance data is read directly on-chain by the frontend hooks
-      return [];
+      const [row] = await ctx.db
+        .select()
+        .from(govRealms)
+        .where(eq(govRealms.securityMint, input.mint))
+        .limit(1);
+      if (row) return row;
+      try {
+        return await fetchRealmOnChain(input.mint);
+      } catch {
+        return null;
+      }
     }),
 
-  getVotes: publicProcedure
-    .input(z.object({ proposalId: z.string() }))
+  listProposals: publicProcedure
+    .input(
+      z.object({
+        mint: z.string(),
+        status: z.enum(["voting", "succeeded", "defeated", "executed", "cancelled"]).optional(),
+      }),
+    )
     .query(async ({ ctx, input }) => {
-      // TODO: Index votes from SPL Governance via webhooks
-      return [];
+      const filters = [eq(govProposals.securityMint, input.mint)];
+      if (input.status) filters.push(eq(govProposals.status, input.status));
+      const rows = await ctx.db
+        .select()
+        .from(govProposals)
+        .where(and(...filters))
+        .orderBy(desc(govProposals.createdAt));
+      if (rows.length > 0) return rows;
+      try {
+        return await fetchProposalsOnChain(input.mint);
+      } catch {
+        return [];
+      }
+    }),
+
+  getProposal: publicProcedure
+    .input(z.object({ pda: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const [row] = await ctx.db
+        .select()
+        .from(govProposals)
+        .where(eq(govProposals.proposalPda, input.pda))
+        .limit(1);
+      return row ?? null;
+    }),
+
+  getVotesForProposal: publicProcedure
+    .input(z.object({ pda: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db
+        .select()
+        .from(govVotes)
+        .where(eq(govVotes.proposalPda, input.pda))
+        .orderBy(desc(govVotes.castAt));
+      return rows;
     }),
 
   realmStats: publicProcedure
-    .input(z.object({ realm: z.string() }))
+    .input(z.object({ mint: z.string() }))
     .query(async ({ ctx, input }) => {
-      // TODO: Aggregate from indexed data
+      const proposals = await ctx.db
+        .select()
+        .from(govProposals)
+        .where(eq(govProposals.securityMint, input.mint));
       return {
-        totalProposals: 0,
-        activeProposals: 0,
-        participationRate: 0,
+        totalProposals: proposals.length,
+        voting: proposals.filter((p) => p.status === "voting").length,
+        succeeded: proposals.filter((p) => p.status === "succeeded").length,
+        executed: proposals.filter((p) => p.status === "executed").length,
+        defeated: proposals.filter((p) => p.status === "defeated").length,
       };
     }),
 });

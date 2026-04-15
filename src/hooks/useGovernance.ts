@@ -1,112 +1,178 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { PROGRAM_IDS, deriveGovernanceConfigPDA } from "@/lib/solana";
-import type { Proposal, GovernanceConfig, ProposalStatus } from "@/types/governance";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
+import { toast } from "sonner";
+import { trpc } from "@/lib/trpc";
+import { useDinoGovernanceProgram } from "@/lib/anchor";
+import {
+  createRealm,
+  createProposal,
+  castVote,
+  finalizeProposal,
+  executeProposal,
+  type CreateProposalInput,
+  DEFAULT_REALM_PARAMS,
+} from "@/lib/governanceActions";
 
-// Mock fallback until SPL Governance integration is complete
-import { proposals as mockProposals } from "@/lib/mockData";
-
-/**
- * Fetch governance config for a security series
- */
-export function useGovernanceConfig(seriesMint: PublicKey | null) {
-  const { connection } = useConnection();
-  const programDeployed = !PROGRAM_IDS.DINO_CORE.equals(SystemProgram.programId);
-
+export function useRealm(mint: string | null) {
   return useQuery({
-    queryKey: ["governanceConfig", seriesMint?.toBase58()],
-    queryFn: async (): Promise<GovernanceConfig | null> => {
-      if (!seriesMint || !programDeployed) return null;
-
-      const [pda] = deriveGovernanceConfigPDA(seriesMint);
-      const account = await connection.getAccountInfo(pda);
-
-      if (!account) return null;
-
-      // TODO: Decode with Anchor when program is deployed
-      return null;
-    },
-    enabled: !!seriesMint && programDeployed,
-    staleTime: 60_000,
+    queryKey: ["governance", "realm", mint],
+    queryFn: () => trpc.governance.getRealm.query({ mint: mint! }),
+    enabled: !!mint,
+    refetchInterval: 30_000,
   });
 }
 
-/**
- * Fetch all proposals — falls back to mock data
- */
-export function useProposals(filterStatus?: ProposalStatus) {
+export function useProposals(mint: string | null) {
   return useQuery({
-    queryKey: ["proposals", filterStatus],
-    queryFn: async () => {
-      // TODO: Replace with real SPL Governance account fetching
-      // For now return mock proposals mapped to our Proposal type
-      let filtered = mockProposals;
-      if (filterStatus) {
-        filtered = mockProposals.filter((p) => p.status === filterStatus);
-      }
-      return filtered;
-    },
-    staleTime: 30_000,
+    queryKey: ["governance", "proposals", mint],
+    queryFn: () => trpc.governance.listProposals.query({ mint: mint! }),
+    enabled: !!mint,
+    refetchInterval: 30_000,
   });
 }
 
-/**
- * Mutation: Cast a vote on a proposal via SPL Governance
- */
+export function useProposal(pda: string | null) {
+  return useQuery({
+    queryKey: ["governance", "proposal", pda],
+    queryFn: () => trpc.governance.getProposal.query({ pda: pda! }),
+    enabled: !!pda,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useVotesForProposal(pda: string | null) {
+  return useQuery({
+    queryKey: ["governance", "votes", pda],
+    queryFn: () => trpc.governance.getVotesForProposal.query({ pda: pda! }),
+    enabled: !!pda,
+    refetchInterval: 30_000,
+  });
+}
+
+export function useRealmStats(mint: string | null) {
+  return useQuery({
+    queryKey: ["governance", "stats", mint],
+    queryFn: () => trpc.governance.realmStats.query({ mint: mint! }),
+    enabled: !!mint,
+    refetchInterval: 60_000,
+  });
+}
+
+export function useCreateRealm() {
+  const wallet = useWallet();
+  const program = useDinoGovernanceProgram();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { mint: string }) => {
+      if (!program) throw new Error("Connect your wallet first.");
+      const sig = await createRealm(
+        program,
+        wallet,
+        new PublicKey(params.mint),
+        DEFAULT_REALM_PARAMS,
+      );
+      return sig;
+    },
+    onSuccess: (_sig, vars) => {
+      toast.success("Governance realm created");
+      qc.invalidateQueries({ queryKey: ["governance", "realm", vars.mint] });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Failed to create realm"),
+  });
+}
+
+export function useCreateProposal(mint: string | null) {
+  const wallet = useWallet();
+  const program = useDinoGovernanceProgram();
+  const realm = useRealm(mint);
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: Omit<CreateProposalInput, "mint">) => {
+      if (!program) throw new Error("Connect your wallet first.");
+      if (!mint) throw new Error("Missing security mint.");
+      if (!realm.data) throw new Error("Realm not initialized for this series yet.");
+      const { signature, proposalPda } = await createProposal(
+        program,
+        wallet,
+        { ...input, mint: new PublicKey(mint) },
+        realm.data.proposalCount ?? 0,
+      );
+      return { signature, proposalPda: proposalPda.toBase58() };
+    },
+    onSuccess: () => {
+      toast.success("Proposal submitted on-chain");
+      qc.invalidateQueries({ queryKey: ["governance", "proposals", mint] });
+      qc.invalidateQueries({ queryKey: ["governance", "realm", mint] });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Failed to create proposal"),
+  });
+}
+
 export function useCastVote() {
-  const { publicKey } = useWallet();
-  const queryClient = useQueryClient();
-
+  const wallet = useWallet();
+  const program = useDinoGovernanceProgram();
+  const qc = useQueryClient();
   return useMutation({
     mutationFn: async (params: {
-      proposalId: string;
-      realm: PublicKey;
-      vote: "for" | "against" | "abstain";
+      proposalPda: string;
+      mint: string;
+      choice: "Yes" | "No" | "Abstain";
     }) => {
-      if (!publicKey) throw new Error("Wallet not connected");
-
-      // TODO: Implement real SPL Governance vote casting
-      // 1. Get governance token owner record
-      // 2. Build castVote instruction
-      // 3. Submit transaction
-      console.log("Casting vote:", params);
-
-      return params.proposalId;
+      if (!program) throw new Error("Connect your wallet first.");
+      return castVote(
+        program,
+        wallet,
+        new PublicKey(params.proposalPda),
+        new PublicKey(params.mint),
+        params.choice,
+      );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["proposals"] });
+    onSuccess: (_sig, vars) => {
+      toast.success(`Vote cast: ${vars.choice}`);
+      qc.invalidateQueries({ queryKey: ["governance", "proposal", vars.proposalPda] });
+      qc.invalidateQueries({ queryKey: ["governance", "votes", vars.proposalPda] });
+      qc.invalidateQueries({ queryKey: ["governance", "proposals", vars.mint] });
     },
+    onError: (e: Error) => toast.error(e.message ?? "Failed to cast vote"),
   });
 }
 
-/**
- * Mutation: Create a new proposal
- */
-export function useCreateProposal() {
-  const { publicKey } = useWallet();
-  const queryClient = useQueryClient();
-
+export function useFinalizeProposal() {
+  const program = useDinoGovernanceProgram();
+  const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (params: {
-      realm: PublicKey;
-      title: string;
-      description: string;
-      proposalType: string;
-      executableInstructions?: string;
-    }) => {
-      if (!publicKey) throw new Error("Wallet not connected");
-
-      // TODO: Implement real SPL Governance proposal creation
-      // 1. Upload description to Arweave
-      // 2. Create proposal via SPL Governance
-      // 3. Add executable instructions if provided
-      console.log("Creating proposal:", params);
-
-      return "proposal_id_placeholder";
+    mutationFn: async (params: { proposalPda: string; mint: string }) => {
+      if (!program) throw new Error("Connect your wallet first.");
+      return finalizeProposal(
+        program,
+        new PublicKey(params.proposalPda),
+        new PublicKey(params.mint),
+      );
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["proposals"] });
+    onSuccess: (_sig, vars) => {
+      toast.success("Proposal finalized");
+      qc.invalidateQueries({ queryKey: ["governance", "proposal", vars.proposalPda] });
+      qc.invalidateQueries({ queryKey: ["governance", "proposals", vars.mint] });
     },
+    onError: (e: Error) => toast.error(e.message ?? "Failed to finalize"),
+  });
+}
+
+export function useExecuteProposal() {
+  const wallet = useWallet();
+  const program = useDinoGovernanceProgram();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (params: { proposalPda: string; mint: string }) => {
+      if (!program) throw new Error("Connect your wallet first.");
+      return executeProposal(program, wallet, new PublicKey(params.proposalPda));
+    },
+    onSuccess: (_sig, vars) => {
+      toast.success("Proposal executed");
+      qc.invalidateQueries({ queryKey: ["governance", "proposal", vars.proposalPda] });
+      qc.invalidateQueries({ queryKey: ["governance", "proposals", vars.mint] });
+    },
+    onError: (e: Error) => toast.error(e.message ?? "Failed to execute"),
   });
 }

@@ -61,11 +61,24 @@ app.post("/webhooks/helius", webhookLimiter, heliusWebhookHandler);
 app.post("/webhooks/kyc", webhookLimiter, async (req, res) => {
   try {
     const raw = (req.body as Buffer).toString("utf8");
-    const signature = String(req.header("x-didit-signature") ?? req.header("x-signature") ?? "");
-    console.log(`[kyc-webhook] received ${raw.length} bytes, sig=${signature.slice(0, 16)}...`);
+    // Didit v3 sends three signatures: X-Signature (HMAC(timestamp + body)),
+    // X-Signature-V2 (same algo, v2 format), and X-Signature-Simple (plain
+    // HMAC(body)). Our verifier computes plain HMAC(body), so we prefer the
+    // Simple variant. Fall back to X-Signature with timestamp prefix.
+    const sigSimple = String(req.header("x-signature-simple") ?? "");
+    const sigLegacy = String(req.header("x-didit-signature") ?? req.header("x-signature") ?? "");
+    const timestamp = String(req.header("x-timestamp") ?? "");
+    console.log(
+      `[kyc-webhook] received ${raw.length} bytes, ` +
+      `simple=${sigSimple.slice(0, 16)}..., legacy=${sigLegacy.slice(0, 16)}..., ts=${timestamp}`,
+    );
     const provider = getKYCProvider();
-    if (!provider.verifyWebhookSignature(raw, signature)) {
-      console.warn("[kyc-webhook] signature verification FAILED");
+    const verified =
+      (sigSimple && provider.verifyWebhookSignature(raw, sigSimple)) ||
+      (sigLegacy && timestamp && provider.verifyWebhookSignature(`${timestamp}.${raw}`, sigLegacy)) ||
+      (sigLegacy && provider.verifyWebhookSignature(raw, sigLegacy));
+    if (!verified) {
+      console.warn("[kyc-webhook] signature verification FAILED (tried simple + timestamp+body + raw)");
       return res.status(401).json({ error: "invalid signature" });
     }
     const payload = JSON.parse(raw);

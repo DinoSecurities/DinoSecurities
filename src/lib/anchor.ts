@@ -2,6 +2,7 @@ import { AnchorProvider, Program, type Idl } from "@coral-xyz/anchor";
 import { useAnchorWallet, useConnection } from "@solana/wallet-adapter-react";
 import { useMemo } from "react";
 import { PROGRAM_IDS } from "./solana";
+import dinoGovernanceIdl from "@/idl/dino_governance.json";
 
 // Placeholder IDLs — these will be replaced with real IDLs once Sorrow deploys the programs
 // For now they define the account/instruction structure we expect
@@ -214,6 +215,22 @@ export function useDinoCoreProgram(): Program | null {
       return new Program(DINO_CORE_IDL, PROGRAM_IDS.DINO_CORE, provider);
     } catch {
       // Program construction fails if IDL or program ID is invalid (placeholder)
+      return null;
+    }
+  }, [provider]);
+}
+
+/**
+ * Hook to get the dino_governance program client using the real IDL
+ * shipped in src/idl/. Returns null if the wallet is not connected.
+ */
+export function useDinoGovernanceProgram(): Program | null {
+  const provider = useAnchorProvider();
+  return useMemo(() => {
+    if (!provider) return null;
+    try {
+      return new Program(dinoGovernanceIdl as Idl, provider);
+    } catch {
       return null;
     }
   }, [provider]);

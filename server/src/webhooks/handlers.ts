@@ -1,5 +1,12 @@
 import { db } from "../db/index.js";
-import { indexedSeries, indexedHolders, settlementOrders } from "../db/schema.js";
+import {
+  indexedSeries,
+  indexedHolders,
+  settlementOrders,
+  govRealms,
+  govProposals,
+  govVotes,
+} from "../db/schema.js";
 import { eq, sql } from "drizzle-orm";
 import { decodeProgramEvents, type DinoEvent } from "./event-decoder.js";
 
@@ -52,15 +59,16 @@ async function dispatch(evt: DinoEvent, signature?: string) {
     case "SettlementExecuted":
       return markSettled(evt.data, signature);
     case "ProposalCreated":
-    case "ProposalFinalized":
-    case "ProposalExecuted":
-    case "VoteCast":
     case "RealmCreated":
-      // Governance state lives off-chain in the proposal/vote PDAs; the
-      // governance router reads them on-demand via @coral-xyz/anchor. We
-      // could mirror to a `governance_proposals` table for fast list views
-      // but that's deferred until the UI proves the perf is needed.
-      return;
+      return upsertRealm(evt.data);
+    case "ProposalCreated":
+      return insertProposal(evt.data, signature);
+    case "VoteCast":
+      return recordVote(evt.data, signature);
+    case "ProposalFinalized":
+      return setProposalStatus(evt.data);
+    case "ProposalExecuted":
+      return markProposalExecuted(evt.data);
     default:
       console.log(`unhandled event: ${evt.name}`);
   }
@@ -141,4 +149,103 @@ async function markSettled(d: any, signature?: string) {
     .update(settlementOrders)
     .set({ status: "settled", settledAt: new Date(), txSignature: signature ?? null })
     .where(eq(settlementOrders.orderId, d.sellOrder));
+}
+
+// ==========================================================================
+// Governance handlers. Events emitted by dino_governance.
+// ==========================================================================
+
+function proposalTypeToString(v: any): string {
+  if (!v) return "Generic";
+  if (typeof v === "string") return v;
+  if (typeof v === "object") return Object.keys(v)[0] ?? "Generic";
+  return "Generic";
+}
+
+function statusToString(v: any): string {
+  const k = proposalTypeToString(v);
+  return k.toLowerCase();
+}
+
+async function upsertRealm(d: any) {
+  // RealmCreated emits just { mint, authority }. Full config is read from
+  // the PDA during the on-chain fetcher fallback; the row here is the index
+  // anchor so listRealms can be cheap.
+  await db
+    .insert(govRealms)
+    .values({
+      securityMint: d.mint,
+      realmPda: d.realm ?? d.realmPda ?? d.mint, // best-effort
+      authority: d.authority,
+      voteThresholdBps: Number(d.voteThresholdBps ?? 5000),
+      quorumBps: Number(d.quorumBps ?? 1000),
+      votingPeriodSec: Number(d.votingPeriod ?? 259_200),
+      cooloffPeriodSec: Number(d.cooloffPeriod ?? 172_800),
+      minProposalWeight: Number(d.minProposalWeight ?? 1),
+    })
+    .onConflictDoNothing({ target: govRealms.securityMint });
+}
+
+async function insertProposal(d: any, signature?: string) {
+  const votingEndsAt = new Date(Number(d.votingEndsAt ?? d.voting_ends_at ?? 0) * 1000);
+  const executionEta = new Date(Number(d.executionEta ?? d.execution_eta ?? 0) * 1000);
+  await db
+    .insert(govProposals)
+    .values({
+      proposalPda: d.proposal,
+      realmPda: d.realm,
+      securityMint: d.mint ?? d.securityMint,
+      proposer: d.proposer,
+      proposalType: proposalTypeToString(d.proposalType ?? d.proposal_type),
+      title: String(d.title ?? ""),
+      descriptionUri: String(d.descriptionUri ?? d.description_uri ?? ""),
+      executionPayloadHex: d.executionPayload
+        ? Buffer.from(d.executionPayload).toString("hex")
+        : null,
+      proposalIndex: Number(d.index ?? 0),
+      status: "voting",
+      votingEndsAt: isNaN(votingEndsAt.getTime()) ? new Date() : votingEndsAt,
+      executionEta: isNaN(executionEta.getTime()) ? new Date() : executionEta,
+    })
+    .onConflictDoNothing({ target: govProposals.proposalPda });
+  void signature;
+}
+
+async function recordVote(d: any, signature?: string) {
+  await db
+    .insert(govVotes)
+    .values({
+      proposalPda: d.proposal,
+      voter: d.voter,
+      choice: proposalTypeToString(d.choice),
+      weight: Number(d.weight ?? 0),
+      txSignature: signature ?? null,
+    })
+    .onConflictDoNothing({ target: [govVotes.proposalPda, govVotes.voter] });
+
+  // Bump the proposal's vote tallies.
+  const choice = proposalTypeToString(d.choice).toLowerCase();
+  const weight = Number(d.weight ?? 0);
+  const col =
+    choice === "yes" ? govProposals.yesVotes :
+    choice === "no" ? govProposals.noVotes :
+    govProposals.abstainVotes;
+  await db
+    .update(govProposals)
+    .set({ [col.name]: sql`${col} + ${weight}`, lastUpdated: new Date() } as any)
+    .where(eq(govProposals.proposalPda, d.proposal));
+}
+
+async function setProposalStatus(d: any) {
+  await db
+    .update(govProposals)
+    .set({ status: statusToString(d.status), lastUpdated: new Date() })
+    .where(eq(govProposals.proposalPda, d.proposal));
+}
+
+async function markProposalExecuted(d: any) {
+  await db
+    .update(govProposals)
+    .set({ status: "executed", lastUpdated: new Date() })
+    .where(eq(govProposals.proposalPda, d.proposal));
 }

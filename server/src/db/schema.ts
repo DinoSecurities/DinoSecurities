@@ -111,6 +111,69 @@ export const documentVersions = pgTable(
   ],
 );
 
+export const govRealms = pgTable(
+  "gov_realms",
+  {
+    securityMint: text("security_mint").primaryKey(),
+    realmPda: text("realm_pda").notNull(),
+    authority: text("authority").notNull(),
+    voteThresholdBps: integer("vote_threshold_bps").notNull(),
+    quorumBps: integer("quorum_bps").notNull(),
+    votingPeriodSec: bigint("voting_period_sec", { mode: "number" }).notNull(),
+    cooloffPeriodSec: bigint("cooloff_period_sec", { mode: "number" }).notNull(),
+    minProposalWeight: bigint("min_proposal_weight", { mode: "number" }).notNull().default(0),
+    proposalCount: bigint("proposal_count", { mode: "number" }).notNull().default(0),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_realm_authority").on(table.authority)],
+);
+
+export const govProposals = pgTable(
+  "gov_proposals",
+  {
+    proposalPda: text("proposal_pda").primaryKey(),
+    realmPda: text("realm_pda").notNull(),
+    securityMint: text("security_mint").notNull(),
+    proposer: text("proposer").notNull(),
+    proposalType: text("proposal_type").notNull(),
+    title: text("title").notNull(),
+    descriptionUri: text("description_uri"),
+    executionPayloadHex: text("execution_payload_hex"),
+    proposalIndex: bigint("proposal_index", { mode: "number" }).notNull(),
+    yesVotes: bigint("yes_votes", { mode: "number" }).notNull().default(0),
+    noVotes: bigint("no_votes", { mode: "number" }).notNull().default(0),
+    abstainVotes: bigint("abstain_votes", { mode: "number" }).notNull().default(0),
+    status: text("status").notNull().default("voting"),
+    votingEndsAt: timestamp("voting_ends_at").notNull(),
+    executionEta: timestamp("execution_eta").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUpdated: timestamp("last_updated").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_proposal_mint").on(table.securityMint),
+    index("idx_proposal_realm").on(table.realmPda),
+    index("idx_proposal_status").on(table.status),
+    index("idx_proposal_proposer").on(table.proposer),
+  ],
+);
+
+export const govVotes = pgTable(
+  "gov_votes",
+  {
+    proposalPda: text("proposal_pda").notNull(),
+    voter: text("voter").notNull(),
+    choice: text("choice").notNull(),
+    weight: bigint("weight", { mode: "number" }).notNull(),
+    txSignature: text("tx_signature"),
+    castAt: timestamp("cast_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_votes_pk").on(table.proposalPda, table.voter),
+    index("idx_votes_proposal").on(table.proposalPda),
+    index("idx_votes_voter").on(table.voter),
+  ],
+);
+
 export const webhookEvents = pgTable("webhook_events", {
   txSignature: text("tx_signature").primaryKey(),
   eventType: text("event_type").notNull(),
