@@ -97,10 +97,19 @@ export async function cosignAndSubmit(
   const rawBytes = Buffer.from(signedTxBase64, "base64");
   const tx = Transaction.from(rawBytes);
 
-  if (tx.instructions.length !== 1) {
-    throw new Error(`expected exactly 1 instruction, got ${tx.instructions.length}`);
+  // Wallets (Phantom, Solflare) often inject ComputeBudget instructions
+  // for priority fees. Those are harmless — ignore them and validate the
+  // real payload instruction.
+  const COMPUTE_BUDGET = new PublicKey("ComputeBudget111111111111111111111111111111");
+  const payloadIxs = tx.instructions.filter(
+    (i) => !i.programId.equals(COMPUTE_BUDGET),
+  );
+  if (payloadIxs.length !== 1) {
+    throw new Error(
+      `expected exactly 1 dino_core instruction, got ${payloadIxs.length} (total=${tx.instructions.length})`,
+    );
   }
-  const ix = tx.instructions[0];
+  const ix = payloadIxs[0];
   if (!ix.programId.equals(DINO_CORE)) {
     throw new Error(`instruction must target dino_core (${DINO_CORE.toBase58()})`);
   }
