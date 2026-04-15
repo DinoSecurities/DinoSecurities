@@ -5,11 +5,16 @@ import CornerBrackets from "./CornerBrackets";
 const phases = [
   { phase: "Phase 1", title: "Foundation", weeks: "Weeks 1–4", desc: "Anchor workspace, dino_core program skeleton, account structures, platform initialization, issuer registration, security series creation.", status: "complete" },
   { phase: "Phase 2", title: "Token-2022", weeks: "Weeks 5–8", desc: "Multi-extension mint creation, transfer hook program, holder registration, compliant minting, force transfer via Permanent Delegate.", status: "complete" },
-  { phase: "Phase 3", title: "Settlement", weeks: "Weeks 9–10", desc: "DinoSettlementEngine, atomic DvP swap, multi-party settlement, off-chain order book integration.", status: "active" },
-  { phase: "Phase 4", title: "Governance", weeks: "Weeks 11–12", desc: "SPL Governance integration, proposal creation and voting, timelock implementation for each security series.", status: "upcoming" },
-  { phase: "Phase 5", title: "Frontend", weeks: "Weeks 13–18", desc: "React + Vite + Tailwind scaffold, wallet adapter, landing page, issuer portal, marketplace, portfolio, governance UI.", status: "upcoming" },
-  { phase: "Phase 6", title: "Infrastructure", weeks: "Weeks 19–22", desc: "Helius RPC + webhooks, KYC oracle server, Arweave pipeline, Grafana monitoring, security audit, legal review.", status: "upcoming" },
-  { phase: "Phase 7", title: "Launch", weeks: "Weeks 23–26", desc: "Mainnet deployment, multisig upgrade authority transfer, genesis security series, public launch.", status: "upcoming" },
+  { phase: "Phase 3", title: "Settlement", weeks: "Weeks 9–10", desc: "DinoSettlementEngine, atomic DvP swap, split token-program support for classic SPL payment mints, settlement agent self-heal ATAs.", status: "complete" },
+  { phase: "Phase 4", title: "Frontend", weeks: "Weeks 11–16", desc: "React + Vite + Tailwind scaffold, wallet adapter, landing page, issuer portal, marketplace, portfolio, settings + KYC flow.", status: "complete" },
+  { phase: "Phase 5", title: "Infrastructure", weeks: "Weeks 17–20", desc: "Helius RPC + webhooks, Didit KYC oracle, Arweave document pipeline, Token-2022 metadata writes, DigitalOcean backend + Supabase indexer.", status: "complete" },
+  { phase: "Phase 6", title: "Mainnet Launch", weeks: "Weeks 21–22", desc: "Three Anchor programs deployed on mainnet-beta, platform initialized, Reg D accreditation + Reg S geo-fence enforced on-chain, end-to-end DvP with real USDC verified.", status: "complete" },
+  { phase: "Phase 7", title: "Trust Signals", weeks: "Next", desc: "Click-to-verify landing-page stats linking to real mainnet txs, client-side Ricardian document hash verifier, and a public pre-trade compliance simulator anyone can run without a wallet.", status: "active" },
+  { phase: "Phase 8", title: "Demonstration", weeks: "Upcoming", desc: "Live mainnet settlement ticker on the landing page and anonymized per-series holder geography heatmap for issuer dashboards.", status: "upcoming" },
+  { phase: "Phase 9", title: "Governance", weeks: "Upcoming", desc: "dino_governance UI — per-series realms, proposal creation, token-weighted voting, and timelock-enforced execution for UpdateLegalDoc, MintAdditional, FreezeHolder, EmergencyPause, and TreasuryTransfer proposals.", status: "upcoming" },
+  { phase: "Phase 10", title: "Distribution", weeks: "Upcoming", desc: "Automatic Rule 10b-10-style trade-confirmation PDF receipts after every settlement, plus an embeddable iframe widget so issuers can surface their series on their own corporate websites.", status: "upcoming" },
+  { phase: "Phase 11", title: "Ecosystem", weeks: "Upcoming", desc: "Soulbound investor-passport NFT minted after KYC, making DinoSecurities a verification source for the rest of the Solana RWA ecosystem. Holding-period enforcement via HolderExt PDAs.", status: "upcoming" },
+  { phase: "Phase 12", title: "Hardening", weeks: "Ongoing", desc: "Third-party security audit (OtterSec / Trail of Bits / Halborn), Squads multisig transfer of program upgrade authority, securities counsel review, insurance procurement, Blowfish/Phantom reputation submission.", status: "upcoming" },
 ];
 
 const fadeUp = {
@@ -38,7 +43,7 @@ const RoadmapSection = () => (
             ROAD<span className="text-muted-foreground">MAP.</span>
           </h2>
           <p className="text-sm md:text-base text-muted-foreground max-w-xl leading-relaxed">
-            A 26-week build plan from on-chain program foundation to mainnet launch.
+            From on-chain program foundation through mainnet launch and into the next wave of trust-signal, distribution, and ecosystem work.
           </p>
         </motion.div>
       </div>
