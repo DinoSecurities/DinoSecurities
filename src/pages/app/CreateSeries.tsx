@@ -402,15 +402,29 @@ const CreateSeries = () => {
             <div>
               <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Regulation Type</label>
               <div className="mt-2 grid grid-cols-3 gap-2">
-                {(["RegD", "RegS", "RegCF", "RegA+", "Ricardian", "None"] as const).map((r) => (
+                {([
+                  { key: "RegD" as const, enabled: true },
+                  { key: "RegS" as const, enabled: true },
+                  { key: "RegCF" as const, enabled: false },
+                  { key: "RegA+" as const, enabled: false },
+                  { key: "Ricardian" as const, enabled: false },
+                  { key: "None" as const, enabled: true },
+                ]).map(({ key: r, enabled }) => (
                   <button
                     key={r}
-                    onClick={() => updateField("regulation", r)}
+                    onClick={() => enabled && updateField("regulation", r)}
+                    disabled={!enabled}
+                    title={enabled ? "" : "Coming soon — on-chain enforcement not yet implemented"}
                     className={`p-3 text-xs font-semibold text-center border transition-colors ${
-                      formData.regulation === r ? "border-primary bg-primary/10 text-primary" : "border-border text-muted-foreground hover:text-foreground"
+                      !enabled
+                        ? "border-border/40 text-muted-foreground/40 cursor-not-allowed"
+                        : formData.regulation === r
+                          ? "border-primary bg-primary/10 text-primary"
+                          : "border-border text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {r}
+                    {!enabled && <div className="text-[9px] font-normal mt-0.5 opacity-70">Coming soon</div>}
                   </button>
                 ))}
               </div>
@@ -419,7 +433,23 @@ const CreateSeries = () => {
               <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30">
                 <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
                 <div className="text-xs text-muted-foreground">
-                  <strong className="text-foreground">Reg D 506(b/c):</strong> Only accredited investors. Transfer hook will check is_accredited flag on HolderRecord PDA for every transfer.
+                  <strong className="text-foreground">Reg D 506(b/c):</strong> Only accredited investors. Transfer hook checks is_accredited flag on HolderRecord PDA for every transfer.
+                </div>
+              </div>
+            )}
+            {formData.regulation === "RegS" && (
+              <div className="flex items-start gap-3 p-4 bg-amber-500/10 border border-amber-500/30">
+                <AlertCircle size={16} className="text-amber-500 shrink-0 mt-0.5" />
+                <div className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">Reg S:</strong> Only non-US holders can receive. Transfer hook checks jurisdiction != "US" on every transfer.
+                </div>
+              </div>
+            )}
+            {formData.regulation === "None" && (
+              <div className="flex items-start gap-3 p-4 bg-muted/20 border border-border">
+                <AlertCircle size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+                <div className="text-xs text-muted-foreground">
+                  <strong className="text-foreground">None:</strong> Any whitelisted holder can receive. Transfer hook still enforces KYC, freeze, and pause checks.
                 </div>
               </div>
             )}

@@ -64,6 +64,7 @@ pub mod dino_transfer_hook {
     ///   4. Holder is not frozen
     ///   5. Holder KYC is not expired
     ///   6. Reg D restriction: holder is accredited (when applicable)
+    ///   7. Reg S restriction: destination is not a US person (when applicable)
     ///
     /// Mint authority + permanent delegate transfers (issuer / settlement
     /// agent) still pass through this hook — that's by design: compliance
@@ -83,6 +84,15 @@ pub mod dino_transfer_hook {
 
         if matches!(series.transfer_restriction, dino_core::TransferRestriction::RegD) {
             require!(dest_holder.is_accredited, HookError::AccreditationRequired);
+        }
+
+        // Reg S: offers may only be made to non-US persons. Reject the
+        // transfer when the destination holder's jurisdiction is "US".
+        if matches!(series.transfer_restriction, dino_core::TransferRestriction::RegS) {
+            require!(
+                dest_holder.jurisdiction != [b'U', b'S'],
+                HookError::RegSUsPersonBlocked,
+            );
         }
 
         Ok(())
@@ -211,4 +221,6 @@ pub enum HookError {
     HolderKycExpired,
     #[msg("Reg D requires accredited investor status")]
     AccreditationRequired,
+    #[msg("Reg S bars transfers to US persons")]
+    RegSUsPersonBlocked,
 }
