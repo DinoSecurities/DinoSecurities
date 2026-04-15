@@ -488,7 +488,7 @@ const CreateSeries = () => {
                   <Check size={28} className="text-emerald-400" />
                 </div>
                 <div className="text-center max-w-md">
-                  <h3 className="text-lg font-semibold text-foreground">Series Live On Devnet</h3>
+                  <h3 className="text-lg font-semibold text-foreground">Series Live{import.meta.env.VITE_SOLANA_NETWORK === "mainnet-beta" ? " On Mainnet" : import.meta.env.VITE_SOLANA_NETWORK === "devnet" ? " On Devnet" : ""}</h3>
                   <div className="mt-3 flex flex-col gap-1 text-xs">
                     <div className="text-muted-foreground">Mint:</div>
                     <a

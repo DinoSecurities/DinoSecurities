@@ -24,10 +24,13 @@ const SERIES_DISCRIMINATOR = (() => {
   return Buffer.from((acct as any)?.discriminator ?? []);
 })();
 
-// Helius free tier doesn't allow getProgramAccounts, which is what this
-// fetcher relies on. Force the public devnet RPC for program-account
-// scans regardless of what SOLANA_RPC_URL points at.
-const RPC_URL = "https://api.devnet.solana.com";
+// Use the configured RPC. Helius free tier blocks getProgramAccounts
+// — paid plan + the public mainnet-beta RPC both allow it. If the
+// configured RPC rejects, fall back to the public cluster RPC.
+const RPC_URL =
+  env.SOLANA_RPC_FALLBACK ||
+  env.SOLANA_RPC_URL ||
+  "https://api.mainnet-beta.solana.com";
 const connection = new Connection(RPC_URL, "confirmed");
 const programId = new PublicKey(env.DINO_CORE_PROGRAM_ID);
 console.log(`[on-chain-fetcher] scanning program ${programId.toBase58()} via ${RPC_URL}`);
