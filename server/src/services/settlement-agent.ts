@@ -22,6 +22,7 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
+  createAssociatedTokenAccountIdempotentInstruction,
 } from "@solana/spl-token";
 import * as anchor from "@coral-xyz/anchor";
 import { BorshAccountsCoder, type Idl } from "@coral-xyz/anchor";
@@ -285,8 +286,27 @@ async function executeMatch(
     .remainingAccounts(remainingAccounts)
     .instruction();
 
+  // Self-heal missing ATAs. The on-chain execute_settlement assumes all
+  // four ATAs already exist; in practice users hit "Buy" before ever
+  // receiving the security or USDC, so the destination ATA isn't
+  // initialized. Idempotent ATA creation is a no-op when the ATA exists.
+  const ataIxs = [
+    createAssociatedTokenAccountIdempotentInstruction(
+      agent.publicKey, buyerPaymentAta, buy.creator, buy.paymentMint, paymentProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+    ),
+    createAssociatedTokenAccountIdempotentInstruction(
+      agent.publicKey, sellerPaymentAta, sell.creator, buy.paymentMint, paymentProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+    ),
+    createAssociatedTokenAccountIdempotentInstruction(
+      agent.publicKey, buyerSecurityAta, buy.creator, buy.securityMint, securityProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+    ),
+    createAssociatedTokenAccountIdempotentInstruction(
+      agent.publicKey, sellerSecurityAta, sell.creator, buy.securityMint, securityProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
+    ),
+  ];
+
   const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("processed");
-  const tx = new Transaction().add(ix);
+  const tx = new Transaction().add(...ataIxs, ix);
   tx.recentBlockhash = blockhash;
   tx.feePayer = agent.publicKey;
   tx.sign(agent);

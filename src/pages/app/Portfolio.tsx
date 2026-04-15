@@ -83,11 +83,11 @@ const Portfolio = () => {
           className="border border-border bg-gradient-to-b from-primary to-primary/90 p-6"
           style={{ boxShadow: "inset 0 1px 0 rgba(255,255,255,0.2), 0 8px 20px rgba(139,92,246,0.12)" }}
         >
-          <span className="text-[10px] uppercase tracking-widest text-primary-foreground/60 font-semibold">Holdings</span>
-          <div className="text-4xl font-semibold text-primary-foreground tracking-tight mt-2">
+          <span className="text-[10px] uppercase tracking-widest text-white/80 font-semibold">Holdings</span>
+          <div className="text-4xl font-semibold text-white tracking-tight mt-2">
             {holdings.length}
           </div>
-          <span className="text-xs text-primary-foreground/60">{holdings.length === 1 ? "security" : "securities"}</span>
+          <span className="text-xs text-white/80">{holdings.length === 1 ? "security" : "securities"}</span>
         </div>
         <div className="border border-border bg-gradient-to-b from-foreground/[0.06] to-foreground/[0.02] p-6">
           <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Total Units</span>
@@ -118,7 +118,9 @@ const Portfolio = () => {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ backgroundColor: "hsl(0,0%,3.9%)", border: "1px solid hsl(0,0%,100%,0.1)", borderRadius: 0, fontSize: 12 }}
+                  contentStyle={{ backgroundColor: "hsl(0,0%,8%)", border: "1px solid hsl(0,0%,100%,0.15)", borderRadius: 0, fontSize: 12, color: "hsl(0,0%,95%)" }}
+                  itemStyle={{ color: "hsl(0,0%,95%)" }}
+                  labelStyle={{ color: "hsl(0,0%,95%)" }}
                   formatter={(value: number) => [value.toLocaleString(), "units"]}
                 />
               </PieChart>

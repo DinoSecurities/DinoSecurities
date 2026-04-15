@@ -33,7 +33,10 @@ import {
   createInitializeTransferHookInstruction,
   createInitializeMetadataPointerInstruction,
   createInitializePermanentDelegateInstruction,
+  createSetAuthorityInstruction,
+  AuthorityType,
 } from "@solana/spl-token";
+import { createInitializeInstruction as createInitializeMetadataInstruction } from "@solana/spl-token-metadata";
 import * as anchor from "@coral-xyz/anchor";
 import type { WalletContextState } from "@solana/wallet-adapter-react";
 import { sha256 } from "@noble/hashes/sha2.js";
@@ -148,7 +151,22 @@ export async function createSecuritySeriesOnChain(
     ExtensionType.PermanentDelegate,
   ];
   const mintLen = getMintLen(extensions);
-  const mintRent = await connection.getMinimumBalanceForRentExemption(mintLen);
+  // TokenMetadata extension is variable-length and gets allocated via
+  // mint.reallocate after init. Pre-fund enough rent for both the base
+  // mint extensions AND the metadata bytes so the reallocate doesn't
+  // need a separate rent top-up.
+  const tokenName = (params.name ?? params.symbol).slice(0, 64);
+  const tokenSymbol = params.symbol.slice(0, 16);
+  const tokenUri = (params.docUri ?? "").slice(0, 200);
+  // Rough metadata TLV size: 4-byte type + 4-byte length + (name+symbol+uri lengths + 12 bytes overhead per field) + 64-byte updateAuthority + 32-byte mint.
+  const metadataLen =
+    4 + 4 + 32 + 32 +
+    4 + tokenName.length +
+    4 + tokenSymbol.length +
+    4 + tokenUri.length;
+  const mintRent = await connection.getMinimumBalanceForRentExemption(
+    mintLen + metadataLen,
+  );
 
   const initMintInitExtrasIx = await hookProgram.methods
     .initializeExtraAccountMetaList()
@@ -198,15 +216,44 @@ export async function createSecuritySeriesOnChain(
         TOKEN_2022_PROGRAM_ID,
       ),
     )
-    // Initialize the mint itself. Mint authority + freeze authority both
-    // delegate to the seriesPda so dino_core can mint and emergency-pause.
+    // Initialize the mint with the issuer as temporary mint authority so
+    // they can sign the metadata initialize that follows. We hand authority
+    // to seriesPda after metadata is written.
     .add(
       createInitializeMintInstruction(
         mint,
         0, // decimals — securities are whole-unit
-        seriesPda,
-        seriesPda,
+        issuer,
+        issuer,
         TOKEN_2022_PROGRAM_ID,
+      ),
+    )
+    // Write the TokenMetadata extension data (name/symbol/uri). Phantom
+    // and other wallets read this so the asset shows as e.g. "DINOMT"
+    // instead of "Unknown Token". Update authority is the seriesPda so
+    // dino_core can update metadata via CPI later.
+    .add(
+      createInitializeMetadataInstruction({
+        programId: TOKEN_2022_PROGRAM_ID,
+        metadata: mint,
+        updateAuthority: seriesPda,
+        mint,
+        mintAuthority: issuer,
+        name: tokenName,
+        symbol: tokenSymbol,
+        uri: tokenUri,
+      }),
+    )
+    // Hand mint + freeze authority to seriesPda so dino_core can mint
+    // additional supply and emergency-pause.
+    .add(
+      createSetAuthorityInstruction(
+        mint, issuer, AuthorityType.MintTokens, seriesPda, [], TOKEN_2022_PROGRAM_ID,
+      ),
+    )
+    .add(
+      createSetAuthorityInstruction(
+        mint, issuer, AuthorityType.FreezeAccount, seriesPda, [], TOKEN_2022_PROGRAM_ID,
       ),
     )
     .add(initMintInitExtrasIx);
