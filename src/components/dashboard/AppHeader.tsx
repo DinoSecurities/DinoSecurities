@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import WalletButton from "@/components/wallet/WalletButton";
 import NetworkBadge from "@/components/wallet/NetworkBadge";
-import BetaBanner from "./BetaBanner";
 
 const mobileNav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
@@ -60,7 +59,6 @@ const AppHeader = ({ collapsed, onToggle }: Props) => {
 
   return (
     <>
-      <BetaBanner />
       <header className="h-16 border-b border-border bg-card/80 backdrop-blur-sm flex items-center justify-between px-4 md:px-6 shrink-0 relative z-40">
         <div className="flex items-center gap-4">
           <button onClick={() => setMobileOpen(true)} className="md:hidden text-muted-foreground hover:text-foreground">
