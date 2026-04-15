@@ -308,6 +308,7 @@ export async function runMatchingTick(): Promise<{
   errors: number;
   agentLoaded: boolean;
   openOrders: number;
+  errorSamples?: string[];
 }> {
   const agent = loadAgent();
   if (!agent) {
