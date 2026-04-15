@@ -1,18 +1,37 @@
-import { useState } from "react";
-import { Shield, User, Bell, Globe, Key, ExternalLink, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Shield, User, Key, ExternalLink, Loader2, Copy, LogOut } from "lucide-react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { trpc } from "@/lib/trpc";
 import { truncateAddress } from "@/lib/solana";
 import { toast } from "sonner";
 
+const NETWORK_LABEL = (() => {
+  const n = import.meta.env.VITE_SOLANA_NETWORK;
+  if (n === "mainnet-beta") return "Solana Mainnet";
+  if (n === "devnet") return "Solana Devnet";
+  return `Solana ${n ?? "unknown"}`;
+})();
+
 const Settings = () => {
-  const { publicKey, connected } = useWallet();
+  const { publicKey, connected, disconnect, wallet: adapterWallet } = useWallet();
   const wallet = publicKey?.toBase58();
-  const [activeTab, setActiveTab] = useState<"profile" | "security" | "notifications" | "preferences">("profile");
+  const [activeTab, setActiveTab] = useState<"profile" | "security">("profile");
   const [saved, setSaved] = useState(false);
-  const [profile, setProfile] = useState({ displayName: "DinoUser", email: "" });
-  const [notifications, setNotifications] = useState({ settlements: true, governance: true, transfers: true, marketing: false });
+  const [profile, setProfile] = useState({ displayName: "", email: "" });
+
+  // Per-wallet local preferences. We have no user-profile backend yet, so
+  // these live in localStorage keyed by the connected wallet pubkey.
+  useEffect(() => {
+    if (!wallet) return;
+    try {
+      const raw = localStorage.getItem(`dino:profile:${wallet}`);
+      if (raw) setProfile(JSON.parse(raw));
+      else setProfile({ displayName: "", email: "" });
+    } catch {
+      setProfile({ displayName: "", email: "" });
+    }
+  }, [wallet]);
 
   const kycStatus = useQuery({
     queryKey: ["kycStatus", wallet],
@@ -35,16 +54,23 @@ const Settings = () => {
     onError: (err: Error) => toast.error(err.message ?? "Failed to start KYC"),
   });
 
-  const handleSave = () => {
+  const handleSaveProfile = () => {
+    if (!wallet) return;
+    localStorage.setItem(`dino:profile:${wallet}`, JSON.stringify(profile));
     setSaved(true);
+    toast.success("Saved locally");
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const copyAddress = async () => {
+    if (!wallet) return;
+    await navigator.clipboard.writeText(wallet);
+    toast.success("Address copied");
   };
 
   const tabs = [
     { id: "profile" as const, label: "Profile", icon: User },
     { id: "security" as const, label: "Security", icon: Key },
-    { id: "notifications" as const, label: "Notifications", icon: Bell },
-    { id: "preferences" as const, label: "Preferences", icon: Globe },
   ];
 
   return (
@@ -85,7 +111,7 @@ const Settings = () => {
                     <span className={
                       kycStatus.data?.status === "verified" ? "text-emerald-400 font-semibold" :
                       kycStatus.data?.status === "pending" ? "text-amber-400 font-semibold" :
-                      kycStatus.data?.status === "rejected" || kycStatus.data?.status === "revoked" ? "text-red-400 font-semibold" :
+                      kycStatus.data?.status === "rejected" || kycStatus.data?.status === "revoked" || kycStatus.data?.status === "expired" ? "text-red-400 font-semibold" :
                       "text-muted-foreground"
                     }>
                       {kycStatus.isLoading ? "…" : (kycStatus.data?.status ?? "none")}
@@ -138,28 +164,45 @@ const Settings = () => {
         <div className="lg:col-span-9 border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01]">
           {activeTab === "profile" && (
             <div className="p-6 flex flex-col gap-6">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Profile Information</span>
+              <div>
+                <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Profile Information</span>
+                <p className="text-[10px] text-muted-foreground mt-1">Stored in your browser only — never sent to our servers.</p>
+              </div>
               <div className="flex items-center gap-4">
-                <div className="w-16 h-16 bg-primary/20 border border-primary/40 flex items-center justify-center text-xl font-bold text-primary">
+                <div className="w-16 h-16 bg-primary/15 border border-primary/40 flex items-center justify-center text-2xl font-semibold text-primary">
                   {(profile.displayName?.[0] ?? "D").toUpperCase()}
                 </div>
                 <div>
                   <div className="text-sm font-semibold text-foreground">{profile.displayName || "Anonymous"}</div>
-                  <div className="text-xs text-muted-foreground font-mono">{wallet ? truncateAddress(wallet) : "Not connected"}</div>
+                  <div className="text-[11px] text-muted-foreground font-mono">{truncateAddress(wallet ?? "")}</div>
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Display Name</label>
-                  <input value={profile.displayName} onChange={(e) => setProfile({ ...profile, displayName: e.target.value })} className="w-full mt-2 bg-secondary border border-border px-4 py-3 text-foreground text-sm focus:outline-none focus:border-primary/50" />
+                  <input
+                    value={profile.displayName}
+                    onChange={(e) => setProfile({ ...profile, displayName: e.target.value })}
+                    placeholder="DinoUser"
+                    className="w-full mt-2 bg-secondary border border-border px-4 py-3 text-foreground text-sm focus:outline-none focus:border-primary/50"
+                  />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Email</label>
-                  <input value={profile.email} onChange={(e) => setProfile({ ...profile, email: e.target.value })} className="w-full mt-2 bg-secondary border border-border px-4 py-3 text-foreground text-sm focus:outline-none focus:border-primary/50" />
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Email <span className="opacity-60">(optional)</span></label>
+                  <input
+                    value={profile.email}
+                    onChange={(e) => setProfile({ ...profile, email: e.target.value })}
+                    placeholder="you@example.com"
+                    className="w-full mt-2 bg-secondary border border-border px-4 py-3 text-foreground text-sm focus:outline-none focus:border-primary/50"
+                  />
                 </div>
               </div>
-              <div className="flex items-center gap-3">
-                <button onClick={handleSave} className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-semibold hover:opacity-90 transition-all">
+              <div>
+                <button
+                  onClick={handleSaveProfile}
+                  disabled={!wallet}
+                  className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-semibold hover:opacity-90 transition-all disabled:opacity-50"
+                >
                   {saved ? "Saved ✓" : "Save Changes"}
                 </button>
               </div>
@@ -170,71 +213,40 @@ const Settings = () => {
             <div className="p-6 flex flex-col gap-6">
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Security Settings</span>
               <div className="flex flex-col gap-4">
-                {[
-                  { title: "Connected Wallet", desc: "7xKpR4...mN4q — Phantom", action: "Change" },
-                  { title: "Two-Factor Auth", desc: "TOTP authenticator enabled", action: "Configure" },
-                  { title: "Session Timeout", desc: "Auto-disconnect after 30 minutes of inactivity", action: "Edit" },
-                  { title: "Trusted Devices", desc: "2 devices registered", action: "Manage" },
-                ].map((item) => (
-                  <div key={item.title} className="flex items-center justify-between p-4 border border-border hover:bg-secondary/20 transition-colors">
-                    <div>
-                      <div className="text-sm font-medium text-foreground">{item.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
-                    </div>
-                    <button className="text-[10px] uppercase tracking-widest text-primary font-semibold hover:underline">{item.action}</button>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {activeTab === "notifications" && (
-            <div className="p-6 flex flex-col gap-6">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Notification Preferences</span>
-              {(Object.entries(notifications) as [keyof typeof notifications, boolean][]).map(([key, enabled]) => (
-                <div key={key} className="flex items-center justify-between p-4 border border-border">
+                <div className="flex items-center justify-between p-4 border border-border">
                   <div>
-                    <div className="text-sm font-medium text-foreground capitalize">{key}</div>
-                    <div className="text-xs text-muted-foreground mt-0.5">
-                      {key === "settlements" && "DvP settlement status updates"}
-                      {key === "governance" && "New proposals and voting reminders"}
-                      {key === "transfers" && "Token transfer confirmations"}
-                      {key === "marketing" && "Product updates and announcements"}
+                    <div className="text-sm font-medium text-foreground">Connected Wallet</div>
+                    <div className="text-xs text-muted-foreground mt-0.5 font-mono">
+                      {wallet ? truncateAddress(wallet) : "Not connected"}
+                      {adapterWallet?.adapter.name ? ` — ${adapterWallet.adapter.name}` : ""}
                     </div>
                   </div>
-                  <button
-                    onClick={() => setNotifications({ ...notifications, [key]: !enabled })}
-                    className={`w-11 h-6 rounded-full relative transition-colors ${enabled ? "bg-primary" : "bg-secondary border border-border"}`}
-                  >
-                    <div className={`absolute top-1 w-4 h-4 rounded-full transition-all ${enabled ? "right-1 bg-primary-foreground" : "left-1 bg-muted-foreground"}`} />
-                  </button>
-                </div>
-              ))}
-              <button onClick={handleSave} className="bg-foreground text-background px-6 py-2.5 text-[10px] uppercase tracking-widest font-semibold hover:opacity-90 transition-all self-start">
-                {saved ? "Saved ✓" : "Save Preferences"}
-              </button>
-            </div>
-          )}
-
-          {activeTab === "preferences" && (
-            <div className="p-6 flex flex-col gap-6">
-              <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">App Preferences</span>
-              {[
-                { title: "Theme", desc: "Dark mode (system default)", icon: Moon },
-                { title: "Language", desc: "English (US)", icon: Globe },
-                { title: "Network", desc: "Solana Mainnet-Beta", icon: Shield },
-              ].map((item) => (
-                <div key={item.title} className="flex items-center justify-between p-4 border border-border">
-                  <div className="flex items-center gap-3">
-                    <item.icon size={16} className="text-muted-foreground" />
-                    <div>
-                      <div className="text-sm font-medium text-foreground">{item.title}</div>
-                      <div className="text-xs text-muted-foreground mt-0.5">{item.desc}</div>
-                    </div>
+                  <div className="flex gap-2">
+                    {wallet && (
+                      <button onClick={copyAddress} className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-primary font-semibold hover:underline">
+                        <Copy size={12} /> Copy
+                      </button>
+                    )}
+                    {connected && (
+                      <button onClick={() => disconnect()} className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-red-400 font-semibold hover:underline">
+                        <LogOut size={12} /> Disconnect
+                      </button>
+                    )}
                   </div>
-                  <button className="text-[10px] uppercase tracking-widest text-primary font-semibold hover:underline">Change</button>
                 </div>
-              ))}
+                <div className="flex items-center justify-between p-4 border border-border">
+                  <div>
+                    <div className="text-sm font-medium text-foreground">Network</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{NETWORK_LABEL}</div>
+                  </div>
+                </div>
+                <div className="flex items-start gap-3 p-4 bg-muted/20 border border-border">
+                  <Shield size={16} className="text-muted-foreground shrink-0 mt-0.5" />
+                  <div className="text-xs text-muted-foreground">
+                    Authentication is handled by your Solana wallet. There is no password, email login, 2FA, or stored session on our servers — your wallet signature IS the login. To revoke access, disconnect in your wallet.
+                  </div>
+                </div>
+              </div>
             </div>
           )}
         </div>
