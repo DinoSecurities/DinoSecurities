@@ -104,6 +104,7 @@ async function main() {
   log("actors", "funded both with 0.04 SOL each");
 
   // --- payment mint (plain SPL token, deployer is mint authority) -----------
+  // Classic SPL, matching real USDC on mainnet.
   const paymentMint = Keypair.generate();
   const paymentDecimals = 6;
   const paymentLen = 82; // classic SPL mint

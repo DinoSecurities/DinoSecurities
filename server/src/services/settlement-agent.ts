@@ -241,8 +241,13 @@ async function executeMatch(
     buy.securityMint, sell.creator, false, securityProgram, ASSOCIATED_TOKEN_PROGRAM_ID,
   );
 
-  // Transfer-hook extras. Token-2022 needs these in the outer tx so the
-  // CPI into dino_transfer_hook resolves correctly.
+  // Transfer-hook extras. Token-2022 forwards the outer tx's
+  // remaining_accounts as-is to the hook Execute ix, in this order:
+  //   [0] ExtraAccountMetaList PDA (hook reads it to resolve extras)
+  //   [1] dino_core program    (extras[0] in hook's declaration)
+  //   [2] series PDA           (extras[1])
+  //   [3] dest HolderRecord    (extras[2])
+  //   [4] hook program ID      (so Token-2022 can invoke)
   const [extraMetaPda] = PublicKey.findProgramAddressSync(
     [Buffer.from("extra-account-metas"), buy.securityMint.toBuffer()],
     hookProgramId,
@@ -253,11 +258,11 @@ async function executeMatch(
   );
 
   const remainingAccounts: AccountMeta[] = [
-    { pubkey: hookProgramId, isSigner: false, isWritable: false },
     { pubkey: extraMetaPda, isSigner: false, isWritable: false },
     { pubkey: programId, isSigner: false, isWritable: false },
     { pubkey: seriesPda, isSigner: false, isWritable: false },
     { pubkey: destHolderPda, isSigner: false, isWritable: false },
+    { pubkey: hookProgramId, isSigner: false, isWritable: false },
   ];
 
   const ix = await program.methods
@@ -274,7 +279,8 @@ async function executeMatch(
       buyerSecurityAta,
       sellerSecurityAta,
       agent: agent.publicKey,
-      tokenProgram: securityProgram,
+      securityTokenProgram: securityProgram,
+      paymentTokenProgram: paymentProgram,
     })
     .remainingAccounts(remainingAccounts)
     .instruction();

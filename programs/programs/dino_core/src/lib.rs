@@ -4,7 +4,7 @@
 use anchor_lang::prelude::*;
 use anchor_spl::associated_token::AssociatedToken;
 use anchor_spl::token_2022::{self, Token2022};
-use anchor_spl::token_interface::{Mint, TokenAccount, TransferChecked};
+use anchor_spl::token_interface::{self, Mint, TokenAccount, TokenInterface, TransferChecked};
 
 declare_id!("2357nPiEYZS5YFmMoviaS5f4jGBSEaV8hR5TZsXM25sA");
 
@@ -281,7 +281,9 @@ pub mod dino_core {
         Ok(())
     }
 
-    pub fn execute_settlement(ctx: Context<ExecuteSettlement>) -> Result<()> {
+    pub fn execute_settlement<'info>(
+        ctx: Context<'_, '_, '_, 'info, ExecuteSettlement<'info>>,
+    ) -> Result<()> {
         require!(
             ctx.accounts.agent.key() == ctx.accounts.platform.settlement_agent,
             DinoError::UnauthorizedAgent
@@ -305,9 +307,13 @@ pub mod dino_core {
         let series = &ctx.accounts.series;
         require!(!series.paused, DinoError::SeriesPaused);
 
-        token_2022::transfer_checked(
+        // Payment leg — dispatch to whichever token program owns the payment
+        // mint (classic SPL for real USDC, Token-2022 for yield-bearing
+        // stablecoins). token_interface::transfer_checked routes the CPI via
+        // Interface so either program works.
+        token_interface::transfer_checked(
             CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
+                ctx.accounts.payment_token_program.to_account_info(),
                 TransferChecked {
                     from: ctx.accounts.buyer_payment_ata.to_account_info(),
                     mint: ctx.accounts.payment_mint.to_account_info(),
@@ -319,18 +325,22 @@ pub mod dino_core {
             ctx.accounts.payment_mint.decimals,
         )?;
 
-        token_2022::transfer_checked(
-            CpiContext::new(
-                ctx.accounts.token_program.to_account_info(),
-                TransferChecked {
-                    from: ctx.accounts.seller_security_ata.to_account_info(),
-                    mint: ctx.accounts.security_mint.to_account_info(),
-                    to: ctx.accounts.buyer_security_ata.to_account_info(),
-                    authority: ctx.accounts.agent.to_account_info(),
-                },
-            ),
+        // Security leg — Token-2022 with a transfer hook. Use the spl
+        // helper that resolves the hook's ExtraAccountMetaList + invokes
+        // transfer_checked with the hook extras appended. anchor-spl's
+        // `transfer_checked` wrapper doesn't forward remaining_accounts
+        // through the CPI, which causes the hook program account not to
+        // be in scope (MissingAccount).
+        spl_token_2022::onchain::invoke_transfer_checked(
+            &ctx.accounts.security_token_program.key(),
+            ctx.accounts.seller_security_ata.to_account_info(),
+            ctx.accounts.security_mint.to_account_info(),
+            ctx.accounts.buyer_security_ata.to_account_info(),
+            ctx.accounts.agent.to_account_info(),
+            ctx.remaining_accounts,
             sell.token_amount,
             ctx.accounts.security_mint.decimals,
+            &[],
         )?;
 
         let token_amount = ctx.accounts.buy_order.token_amount;
@@ -606,7 +616,12 @@ pub struct ExecuteSettlement<'info> {
     pub seller_security_ata: Box<InterfaceAccount<'info, TokenAccount>>,
 
     pub agent: Signer<'info>,
-    pub token_program: Program<'info, Token2022>,
+    /// Token program that owns the security mint — always Token-2022
+    /// because the mint carries the transfer-hook extension.
+    pub security_token_program: Program<'info, Token2022>,
+    /// Token program that owns the payment mint — Interface so either
+    /// classic SPL Token (real USDC) or Token-2022 works.
+    pub payment_token_program: Interface<'info, TokenInterface>,
 }
 
 // ============================================================================
