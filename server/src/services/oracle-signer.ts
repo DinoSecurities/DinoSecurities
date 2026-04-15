@@ -97,22 +97,19 @@ export async function cosignAndSubmit(
   const rawBytes = Buffer.from(signedTxBase64, "base64");
   const tx = Transaction.from(rawBytes);
 
-  // Wallets (Phantom, Solflare) often inject ComputeBudget instructions
-  // for priority fees. Those are harmless — ignore them and validate the
-  // real payload instruction.
-  const COMPUTE_BUDGET = new PublicKey("ComputeBudget111111111111111111111111111111");
-  const payloadIxs = tx.instructions.filter(
-    (i) => !i.programId.equals(COMPUTE_BUDGET),
-  );
-  if (payloadIxs.length !== 1) {
+  // Wallets (Phantom, Solflare) inject arbitrary instructions — priority
+  // fees (ComputeBudget), memos, shield markers, etc. We only care about
+  // one thing: that there is exactly one dino_core instruction with the
+  // expected discriminator, and the user has signed the whole tx (so
+  // they've seen everything else in the wallet popup).
+  const dinoIxs = tx.instructions.filter((i) => i.programId.equals(DINO_CORE));
+  if (dinoIxs.length !== 1) {
+    const programs = tx.instructions.map((i) => i.programId.toBase58()).join(",");
     throw new Error(
-      `expected exactly 1 dino_core instruction, got ${payloadIxs.length} (total=${tx.instructions.length})`,
+      `expected exactly 1 dino_core instruction, got ${dinoIxs.length} (total=${tx.instructions.length}) programs=${programs}`,
     );
   }
-  const ix = payloadIxs[0];
-  if (!ix.programId.equals(DINO_CORE)) {
-    throw new Error(`instruction must target dino_core (${DINO_CORE.toBase58()})`);
-  }
+  const ix = dinoIxs[0];
 
   const expectedDisc =
     expected === "register_issuer" ? REGISTER_ISSUER_DISC : REGISTER_HOLDER_DISC;

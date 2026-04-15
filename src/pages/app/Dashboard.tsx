@@ -12,6 +12,7 @@ import {
   Coins,
 } from "lucide-react";
 import StatCard from "@/components/dashboard/StatCard";
+import { NETWORK } from "@/providers/SolanaProvider";
 import { useMyTokenBalances } from "@/hooks/useTokenBalance";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
 
@@ -68,11 +69,11 @@ const Dashboard = () => {
           label="Available Securities"
           value={`${securities.data?.length ?? 0}`}
           icon={Coins}
-          subtitle="indexed on devnet"
+          subtitle={`indexed on ${NETWORK === "mainnet-beta" ? "mainnet" : NETWORK}`}
         />
         <StatCard
           label="Network"
-          value="Devnet"
+          value={NETWORK === "mainnet-beta" ? "Mainnet" : NETWORK === "devnet" ? "Devnet" : NETWORK}
           icon={Activity}
           subtitle="Solana"
         />
@@ -158,7 +159,7 @@ const Dashboard = () => {
         <div className="flex items-center gap-4">
           <TrendingUp size={28} className="text-primary" />
           <div>
-            <div className="text-sm font-semibold text-foreground">Devnet — testing live programs</div>
+            <div className="text-sm font-semibold text-foreground">{NETWORK === "mainnet-beta" ? "Mainnet — live" : `${NETWORK === "devnet" ? "Devnet" : NETWORK} — testing live programs`}</div>
             <div className="text-xs text-muted-foreground mt-0.5">
               All data is real on-chain state. Issue your first security via the Issuer Portal to see the marketplace and your dashboard populate.
             </div>
