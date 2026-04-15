@@ -57,6 +57,8 @@ const Settings = () => {
   const handleSaveProfile = () => {
     if (!wallet) return;
     localStorage.setItem(`dino:profile:${wallet}`, JSON.stringify(profile));
+    // Notify other components in the same tab (navbar) to re-read the profile.
+    window.dispatchEvent(new Event("dino:profile-updated"));
     setSaved(true);
     toast.success("Saved locally");
     setTimeout(() => setSaved(false), 2000);

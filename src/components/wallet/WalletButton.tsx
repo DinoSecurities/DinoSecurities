@@ -3,6 +3,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { LogOut, Copy, Check, ExternalLink, Wallet } from "lucide-react";
 import { openWalletModal } from "./walletModalState";
+import { useDisplayName } from "@/hooks/useDisplayName";
 
 interface WalletButtonProps {
   compact?: boolean;
@@ -10,6 +11,7 @@ interface WalletButtonProps {
 
 export default function WalletButton({ compact = false }: WalletButtonProps) {
   const { publicKey, connected, disconnect, wallet } = useWallet();
+  const displayName = useDisplayName(publicKey?.toBase58());
   const [menuOpen, setMenuOpen] = useState(false);
   const [copied, setCopied] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -40,8 +42,8 @@ export default function WalletButton({ compact = false }: WalletButtonProps) {
           className="flex items-center gap-2 bg-secondary border border-border px-3 py-1.5 hover:bg-secondary/80 transition-colors cursor-pointer"
         >
           <div className="w-2 h-2 rounded-full bg-primary shadow-[0_0_4px] shadow-primary" />
-          <span className="text-xs font-mono text-foreground">
-            {truncateAddress(publicKey.toBase58())}
+          <span className={`text-xs text-foreground ${displayName ? "font-medium" : "font-mono"}`}>
+            {displayName || truncateAddress(publicKey.toBase58())}
           </span>
         </button>
 
@@ -49,7 +51,7 @@ export default function WalletButton({ compact = false }: WalletButtonProps) {
           <div className="absolute right-0 top-full mt-2 w-56 bg-card border border-border shadow-2xl z-50">
             <div className="p-3 border-b border-border">
               <div className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold mb-1">
-                {wallet?.adapter.name || "Wallet"}
+                {displayName || wallet?.adapter.name || "Wallet"}
               </div>
               <div className="text-xs font-mono text-foreground truncate">
                 {publicKey.toBase58()}
