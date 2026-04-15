@@ -101,7 +101,7 @@ const Portfolio = () => {
           <div className="text-4xl font-semibold text-foreground tracking-tight mt-2">
             {isLoading ? "—" : "Live"}
           </div>
-          <span className="text-xs text-muted-foreground">on Solana devnet</span>
+          <span className="text-xs text-muted-foreground">on Solana {import.meta.env.VITE_SOLANA_NETWORK === "mainnet-beta" ? "mainnet" : import.meta.env.VITE_SOLANA_NETWORK === "devnet" ? "devnet" : import.meta.env.VITE_SOLANA_NETWORK}</span>
         </div>
       </div>
 

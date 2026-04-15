@@ -92,7 +92,7 @@ const Settlement = () => {
         <Wallet size={48} className="text-muted-foreground mb-4" />
         <h2 className="text-2xl font-semibold text-foreground mb-2">Connect a wallet</h2>
         <p className="text-sm text-muted-foreground max-w-md">
-          Settlement orders are tied to your Solana address. Connect Phantom (devnet) to create and manage DvP orders.
+          Settlement orders are tied to your Solana address. Connect Phantom to create and manage DvP orders.
         </p>
       </div>
     );
