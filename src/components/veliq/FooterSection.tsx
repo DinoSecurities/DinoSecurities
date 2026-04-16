@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, Shield, Check, X } from "lucide-react";
 import BeamLines from "./BeamLines";
+import PaymentBadges from "@/components/PaymentBadges";
 
 const footerLinks = {
   Platform: [
@@ -125,6 +126,11 @@ const FooterSection = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* Accepted payments */}
+      <div className="relative z-10 w-full max-w-7xl mx-auto border-t border-border pt-8 pb-6">
+        <PaymentBadges />
       </div>
 
       {/* Bottom bar */}

@@ -9,6 +9,7 @@ import { PROGRAM_IDS, truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
 import { useOnChainOrders, useMyOrders, type OnChainOrder } from "@/hooks/useOnChainOrders";
 import { createSettlementOrderOnChain, cancelSettlementOrderOnChain } from "@/lib/settlementActions";
+import PaymentBadges from "@/components/PaymentBadges";
 
 type Tab = "book" | "mine";
 
@@ -330,6 +331,9 @@ const Settlement = () => {
                   Implied price: <span className="text-foreground font-mono">${(Number(paymentAmount) / Number(tokenAmount)).toFixed(4)} / token</span>
                 </div>
               )}
+              <div className="pt-3 border-t border-border/50">
+                <PaymentBadges size="sm" />
+              </div>
               <button
                 onClick={handleCreate}
                 disabled={busy || !selectedMint || !tokenAmount || !paymentAmount}

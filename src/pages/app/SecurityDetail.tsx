@@ -5,6 +5,7 @@ import { useIndexedSecurityByMint } from "@/hooks/useIndexedSecurities";
 import { useHoldersForMint } from "@/hooks/useHoldersForMint";
 import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { toast } from "sonner";
+import PaymentBadges from "@/components/PaymentBadges";
 
 const SecurityDetail = () => {
   const { mint } = useParams();
@@ -203,6 +204,9 @@ const SecurityDetail = () => {
                   placeholder="0"
                   className="w-full mt-2 bg-secondary border border-border px-4 py-3 text-foreground text-sm focus:outline-none focus:border-primary/50"
                 />
+              </div>
+              <div className="pt-2 border-t border-border/50">
+                <PaymentBadges size="sm" />
               </div>
               <p className="text-[10px] text-muted-foreground">
                 DvP order creation requires a price oracle for the security; integration with the matching engine ships in v0.2.
