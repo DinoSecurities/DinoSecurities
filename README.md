@@ -14,6 +14,16 @@
   <a href="#getting-started">Getting Started</a>
 </p>
 
+<p align="center">
+  <img src="https://img.shields.io/badge/Solana-mainnet--beta-9945FF?style=flat-square&logo=solana&logoColor=white" alt="Solana mainnet-beta" />
+  <img src="https://img.shields.io/badge/Token--2022-live-14F195?style=flat-square&logo=solana&logoColor=white" alt="Token-2022 live" />
+  <img src="https://img.shields.io/badge/Anchor-0.32.1-8b5cf6?style=flat-square" alt="Anchor 0.32.1" />
+  <img src="https://img.shields.io/badge/USDC-accepted-2775CA?style=flat-square&logo=usdc&logoColor=white" alt="USDC accepted" />
+  <img src="https://img.shields.io/badge/wXRP-coming%20soon-23292F?style=flat-square&logo=xrp&logoColor=white" alt="wXRP coming soon" />
+  <img src="https://img.shields.io/badge/license-Apache%202.0-blue?style=flat-square" alt="Apache 2.0" />
+  <img src="https://img.shields.io/badge/release-v1.0.0--rc.1-6b7280?style=flat-square" alt="v1.0.0-rc.1" />
+</p>
+
 ---
 
 ## Overview
