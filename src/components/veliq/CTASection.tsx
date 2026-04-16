@@ -44,10 +44,15 @@ const CTASection = () => (
             Launch App
             <ArrowRight size={14} />
           </button>
-          <button className="w-full sm:w-auto px-8 py-4 border border-border text-[10px] uppercase tracking-widest text-foreground font-semibold hover:bg-secondary hover:border-foreground/30 transition-all duration-300 backdrop-blur-sm flex items-center justify-center gap-2 group">
+          <a
+            href="https://github.com/DinoSecurities/DinoSecurities"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="w-full sm:w-auto px-8 py-4 border border-border text-[10px] uppercase tracking-widest text-foreground font-semibold hover:bg-secondary hover:border-foreground/30 transition-all duration-300 backdrop-blur-sm flex items-center justify-center gap-2 group"
+          >
             <Terminal size={14} className="text-muted-foreground group-hover:text-primary transition-colors" />
             Read Documentation
-          </button>
+          </a>
         </div>
       </motion.div>
     </div>

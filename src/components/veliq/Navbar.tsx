@@ -20,16 +20,23 @@ const Navbar = () => {
       </a>
 
       <ul className="hidden md:flex items-center gap-1 text-sm text-muted-foreground">
-        {["Platform", "Securities", "Roadmap", "Docs"].map((item) => (
-          <li key={item}>
-            <a
-              href={`#${item.toLowerCase()}`}
-              className="block rounded-full px-4 py-1.5 transition-colors duration-300 hover:text-foreground hover:bg-foreground/5"
-            >
-              {item}
-            </a>
-          </li>
-        ))}
+        {["Platform", "Securities", "Roadmap", "Docs"].map((item) => {
+          const isDocs = item === "Docs";
+          const href = isDocs
+            ? "https://github.com/DinoSecurities/DinoSecurities"
+            : `#${item.toLowerCase()}`;
+          return (
+            <li key={item}>
+              <a
+                href={href}
+                {...(isDocs ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                className="block rounded-full px-4 py-1.5 transition-colors duration-300 hover:text-foreground hover:bg-foreground/5"
+              >
+                {item}
+              </a>
+            </li>
+          );
+        })}
       </ul>
 
       <div className="flex items-center gap-2 pr-1">
@@ -50,16 +57,23 @@ const Navbar = () => {
 
       {mobileOpen && (
         <div className="absolute top-full left-0 right-0 mt-2 rounded-2xl p-4 backdrop-blur-xl bg-background/90 border border-border md:hidden">
-          {["Platform", "Securities", "Roadmap", "Docs"].map((item) => (
-            <a
-              key={item}
-              href={`#${item.toLowerCase()}`}
-              className="block px-4 py-3 text-sm text-muted-foreground hover:text-foreground"
-              onClick={() => setMobileOpen(false)}
-            >
-              {item}
-            </a>
-          ))}
+          {["Platform", "Securities", "Roadmap", "Docs"].map((item) => {
+            const isDocs = item === "Docs";
+            const href = isDocs
+              ? "https://github.com/DinoSecurities/DinoSecurities"
+              : `#${item.toLowerCase()}`;
+            return (
+              <a
+                key={item}
+                href={href}
+                {...(isDocs ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                className="block px-4 py-3 text-sm text-muted-foreground hover:text-foreground"
+                onClick={() => setMobileOpen(false)}
+              >
+                {item}
+              </a>
+            );
+          })}
           <div className="flex gap-2 mt-2 pt-2 border-t border-border">
             <a href="/app" className="flex-1 text-center py-2 text-sm font-semibold bg-foreground text-background rounded-full">Launch App</a>
           </div>

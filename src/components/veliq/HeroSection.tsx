@@ -132,10 +132,15 @@ const HeroSection = () => {
             Launch App
           </button>
 
-          <button className="inline-flex transition-all duration-300 text-sm text-muted-foreground rounded-full py-3 px-6 relative gap-x-2 items-center border border-border hover:text-foreground hover:border-foreground/30">
+          <a
+            href="https://github.com/DinoSecurities/DinoSecurities"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex transition-all duration-300 text-sm text-muted-foreground rounded-full py-3 px-6 relative gap-x-2 items-center border border-border hover:text-foreground hover:border-foreground/30"
+          >
             <ArrowRight size={16} />
             Read Documentation
-          </button>
+          </a>
         </motion.div>
 
         <motion.button
