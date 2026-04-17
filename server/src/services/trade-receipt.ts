@@ -31,6 +31,19 @@ export interface SettlementReceiptData {
   finalityMs?: number | null;
   slot?: number | null;
   restriction?: string | null;
+  /** On-chain SHA-256 commitment of the governing document, if any. */
+  docHash?: string | null;
+  /** Arweave URI (ar:// or https://arweave.net/…) of the governing document. */
+  docUri?: string | null;
+  /** Optional ar.io-signed attestation payload for the governing document.
+   * When null, the receipt renders an "ar.io attestation — coming soon"
+   * placeholder so the slot is visible to auditors reading the PDF today. */
+  arioAttestation?: {
+    verified: boolean;
+    ownerAddress: string;
+    gateway: string;
+    attestationUrl?: string;
+  } | null;
 }
 
 const INK = "#0a0a0f";
@@ -188,6 +201,53 @@ export async function buildReceipt(data: SettlementReceiptData): Promise<Buffer>
     doc.image(qrBuf, left + pageW - 96, verifyTop + 28, { width: 96, height: 96 });
   } catch {
     // QR generation is best-effort; receipt still valid without it.
+  }
+
+  // Document provenance — on-chain hash + Arweave URI + ar.io attestation
+  // slot. When `arioAttestation` is populated (post-ar.io-integration),
+  // this renders the signed cert. Until then we render a visible "coming
+  // soon" placeholder so auditors reading the PDF today see that an
+  // additional provenance layer is being built, not absent.
+  const provTop = verifyTop + 110;
+  doc.moveTo(left, provTop).lineTo(left + pageW, provTop).strokeColor(RULE).lineWidth(0.5).stroke();
+  doc.fontSize(8).fillColor(MUTED).font("Helvetica-Bold")
+    .text("DOCUMENT PROVENANCE", left, provTop + 10, { characterSpacing: 1.5 });
+
+  if (data.docHash || data.docUri) {
+    doc.fontSize(8).fillColor(MUTED).font("Helvetica")
+      .text("SHA-256 (on-chain)", left, provTop + 28, { width: 140 });
+    doc.fontSize(8).fillColor(INK).font("Courier")
+      .text(data.docHash ? truncate(data.docHash, 14, 10) : "—",
+        left + 140, provTop + 28, { width: pageW - 140 });
+
+    doc.fontSize(8).fillColor(MUTED).font("Helvetica")
+      .text("Arweave URI", left, provTop + 44, { width: 140 });
+    doc.fontSize(8).fillColor(DINO).font("Courier")
+      .text(data.docUri ? truncate(data.docUri, 12, 10) : "—",
+        left + 140, provTop + 44, { width: pageW - 140,
+          link: data.docUri
+            ? (data.docUri.startsWith("ar://") ? `https://arweave.net/${data.docUri.slice(5)}` : data.docUri)
+            : undefined,
+          underline: !!data.docUri,
+        });
+  }
+
+  // ar.io attestation slot — populated when the gateway-signed cert is
+  // available, placeholder until then.
+  if (data.arioAttestation?.verified) {
+    doc.fontSize(8).fillColor(MUTED).font("Helvetica")
+      .text("ar.io attestation", left, provTop + 60, { width: 140 });
+    doc.fontSize(8).fillColor(INK).font("Helvetica")
+      .text(
+        `Signed by owner ${truncate(data.arioAttestation.ownerAddress)} · gateway ${data.arioAttestation.gateway}`,
+        left + 140, provTop + 60, { width: pageW - 140 },
+      );
+  } else {
+    doc.fontSize(8).fillColor(MUTED).font("Helvetica-Oblique")
+      .text(
+        "ar.io-signed gateway attestation (wallet-level document provenance) — reserved, coming soon.",
+        left, provTop + 60, { width: pageW },
+      );
   }
 
   // Regulatory footer

@@ -234,6 +234,10 @@ app.get("/receipts/:signature.pdf", async (req, res) => {
       finalityMs: row.finalityMs,
       slot: row.settlementSlot,
       restriction: series?.transferRestrictions ?? null,
+      docHash: series?.docHash ?? null,
+      docUri: series?.docUri ?? null,
+      // ar.io-signed attestation slot — null until production integration.
+      arioAttestation: null,
     });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader(

@@ -7,6 +7,7 @@ import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { toast } from "sonner";
 import PaymentBadges from "@/components/PaymentBadges";
 import DocVerificationBadge from "@/components/DocVerificationBadge";
+import VerificationPanel from "@/components/VerificationPanel";
 import HolderGeoMap from "@/components/HolderGeoMap";
 
 const SecurityDetail = () => {
@@ -164,15 +165,7 @@ const SecurityDetail = () => {
               The legal agreement governing this security token is permanently stored on Arweave and cryptographically linked to this token via SHA-256 hash.
             </p>
 
-            <div className="border border-border bg-background/40 p-4 flex flex-col gap-3 mb-4">
-              <DocVerificationBadge docUri={s.docUri} expectedHex={s.docHash} />
-              <p className="text-[11px] text-muted-foreground leading-relaxed">
-                This check runs in your browser — we fetch the Arweave bytes,
-                compute their SHA-256, and compare to the hash committed
-                on-chain. If the document has been altered since issuance, the
-                badge turns red. No trust in DinoSecurities required.
-              </p>
-            </div>
+            <VerificationPanel docUri={s.docUri} expectedHex={s.docHash} className="mb-4" />
 
             {s.docUri ? (
               <div className="flex flex-col gap-2 text-xs">
