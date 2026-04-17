@@ -6,6 +6,7 @@ import { useHoldersForMint } from "@/hooks/useHoldersForMint";
 import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { toast } from "sonner";
 import PaymentBadges from "@/components/PaymentBadges";
+import DocVerificationBadge from "@/components/DocVerificationBadge";
 
 const SecurityDetail = () => {
   const { mint } = useParams();
@@ -161,7 +162,39 @@ const SecurityDetail = () => {
             <p className="text-sm text-muted-foreground leading-relaxed mb-4">
               The legal agreement governing this security token is permanently stored on Arweave and cryptographically linked to this token via SHA-256 hash.
             </p>
-            <p className="text-xs text-muted-foreground mt-4">Document URI populated when issuer uploads via the Issuer Portal wizard.</p>
+
+            <div className="border border-border bg-background/40 p-4 flex flex-col gap-3 mb-4">
+              <DocVerificationBadge docUri={s.docUri} expectedHex={s.docHash} />
+              <p className="text-[11px] text-muted-foreground leading-relaxed">
+                This check runs in your browser — we fetch the Arweave bytes,
+                compute their SHA-256, and compare to the hash committed
+                on-chain. If the document has been altered since issuance, the
+                badge turns red. No trust in DinoSecurities required.
+              </p>
+            </div>
+
+            {s.docUri ? (
+              <div className="flex flex-col gap-2 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Arweave URI</span>
+                  <a
+                    href={s.docUri.startsWith("ar://") ? `https://arweave.net/${s.docUri.slice(5)}` : s.docUri}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 text-primary font-mono hover:underline"
+                  >
+                    {s.docUri.length > 40 ? `${s.docUri.slice(0, 28)}…${s.docUri.slice(-8)}` : s.docUri}
+                    <ExternalLink size={10} />
+                  </a>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">On-chain SHA-256</span>
+                  <span className="text-foreground font-mono text-[10px]">{truncateAddress(s.docHash)}</span>
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs text-muted-foreground mt-4">Document URI populated when issuer uploads via the Issuer Portal wizard.</p>
+            )}
           </div>
           <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-6">
             <div className="flex items-center gap-2 mb-4">
