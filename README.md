@@ -50,6 +50,7 @@ The transfer hook's validation logic — KYC recency, accreditation flag, freeze
 - **Issuer Portal** — Reference UI wizard for deploying a new series end-to-end
 - **Permanent document storage** — SHA-256-pinned uploads to Arweave via Irys
 - **Real-Time Indexing** — Helius webhooks capture on-chain events into PostgreSQL
+- **Click-to-Verify Stats** — every performance number on the landing page links to the actual mainnet settlement tx that proves it. No marketing fluff, only on-chain truth.
 
 ## Tech Stack
 
