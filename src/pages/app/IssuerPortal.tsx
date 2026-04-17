@@ -257,6 +257,14 @@ const IssuerPortal = () => {
               <span className="text-xs text-foreground font-medium">Whitelist Holder</span>
               <span className="text-[10px] text-muted-foreground">register_holder</span>
             </button>
+            <Link
+              to={`/app/issue/bulk-whitelist/${selected.mintAddress}`}
+              className="flex flex-col items-center gap-2 p-4 border border-border hover:bg-secondary/40 transition-colors"
+            >
+              <Users size={20} className="text-primary" />
+              <span className="text-xs text-foreground font-medium">Bulk Import</span>
+              <span className="text-[10px] text-muted-foreground">CSV → batch sign</span>
+            </Link>
             <button
               onClick={() => setActiveAction("mint")}
               className="flex flex-col items-center gap-2 p-4 border border-border hover:bg-secondary/40 transition-colors"
