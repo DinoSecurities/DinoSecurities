@@ -244,3 +244,59 @@ export const webhookEvents = pgTable("webhook_events", {
   processedAt: timestamp("processed_at"),
   receivedAt: timestamp("received_at").defaultNow().notNull(),
 });
+
+/**
+ * Issuer-registered outbound webhook endpoints. One row per (series, URL).
+ * An issuer subscribes their backend to a subset of onchain events we index
+ * — when a matching event lands, the dispatcher POSTs an HMAC-SHA256 signed
+ * payload to `url`. Rotating the secret creates a new value in-place; active
+ * deliveries keep using whatever secret was current at dispatch time.
+ */
+export const issuerWebhooks = pgTable(
+  "issuer_webhooks",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    seriesMint: text("series_mint").notNull(),
+    issuerWallet: text("issuer_wallet").notNull(),
+    url: text("url").notNull(),
+    secret: text("secret").notNull(),
+    eventsSubscribed: text("events_subscribed").array().notNull(),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastRotatedAt: timestamp("last_rotated_at"),
+  },
+  (table) => [
+    index("idx_webhook_series").on(table.seriesMint),
+    index("idx_webhook_issuer").on(table.issuerWallet),
+    uniqueIndex("idx_webhook_series_url").on(table.seriesMint, table.url),
+  ],
+);
+
+/**
+ * Per-attempt delivery log. One row per POST attempt, including retries.
+ * Visible to the issuer in the portal so they can see which events reached
+ * their endpoint and which ones are still bouncing. Status is 'pending'
+ * while in-flight, 'delivered' on 2xx, 'failed' after final retry exhausts.
+ */
+export const webhookDeliveries = pgTable(
+  "webhook_deliveries",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    webhookId: integer("webhook_id").notNull(),
+    eventType: text("event_type").notNull(),
+    txSignature: text("tx_signature"),
+    payload: jsonb("payload").notNull(),
+    attempt: integer("attempt").notNull().default(1),
+    status: text("status").notNull().default("pending"), // 'pending' | 'delivered' | 'failed'
+    responseStatus: integer("response_status"),
+    responseBody: text("response_body"),
+    error: text("error"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    completedAt: timestamp("completed_at"),
+  },
+  (table) => [
+    index("idx_delivery_webhook").on(table.webhookId),
+    index("idx_delivery_status").on(table.status),
+    index("idx_delivery_event").on(table.txSignature),
+  ],
+);
