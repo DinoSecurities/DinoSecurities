@@ -130,6 +130,42 @@ export async function cosignAndSubmit(
     throw new Error("oracle not listed as signer on instruction");
   }
 
+  // Sanctions screening on register_holder. The Rust ix signature is
+  // register_holder(holder: Pubkey, kyc_hash: [u8;32], expiry: i64,
+  // is_accredited: bool, jurisdiction: [u8;2]) — so the holder pubkey
+  // lives at ix.data[8..40] right after the 8-byte Anchor discriminator.
+  if (expected === "register_holder") {
+    const { screenWallet, activeOverrideFor } = await import("./sanctions.js");
+    const holderBytes = ix.data.slice(8, 8 + 32);
+    if (holderBytes.length === 32) {
+      const holderWallet = new PublicKey(holderBytes).toBase58();
+      const result = await screenWallet(holderWallet);
+      if (!result.clean && !result.overrideActive) {
+        // Pull the mint out of the ix accounts for the override record —
+        // register_holder's account layout is [platform, holder_pda, mint,
+        // signer, systemProgram], so mint is ix.keys[2].
+        const mint = ix.keys[2]?.pubkey.toBase58() ?? null;
+        const err = new Error(
+          `sanctions_match: wallet ${holderWallet} hits ${result.hits.length} entry/entries on ${[...new Set(result.hits.map((h) => h.source))].join(", ")}`,
+        );
+        (err as any).code = "SANCTIONS_MATCH";
+        (err as any).details = {
+          wallet: holderWallet,
+          mint,
+          hits: result.hits,
+        };
+        throw err;
+      }
+      if (result.overrideActive) {
+        console.warn(
+          `[sanctions] proceeding on ${holderWallet} despite hits — override #${result.overrideId} active`,
+        );
+      }
+      // Silence unused imports when TS checks strict.
+      void activeOverrideFor;
+    }
+  }
+
   tx.partialSign(oracle);
 
   // Forward to the chain. Use skipPreflight to avoid the preflight cache's

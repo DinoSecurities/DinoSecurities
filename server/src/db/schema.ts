@@ -182,6 +182,59 @@ export const govVotes = pgTable(
   ],
 );
 
+/**
+ * Cached sanctions-list entries — refreshed nightly from OFAC SDN, the
+ * EU Consolidated list, and UK HMT. Keyed by (source, identifier) since
+ * a single individual can appear on multiple lists. Match lookup is done
+ * against `identifier_lower` (wallet pubkey lowercased) OR against the
+ * full `raw` JSON for name/alias fuzzy matching (v2 — wallet-only for
+ * first pass).
+ */
+export const sanctionsEntries = pgTable(
+  "sanctions_entries",
+  {
+    source: text("source").notNull(), // 'ofac_sdn' | 'eu_consolidated' | 'uk_hmt'
+    identifier: text("identifier").notNull(), // wallet address (lowercased) or list-specific ID
+    identifierLower: text("identifier_lower").notNull(),
+    entryType: text("entry_type").notNull(), // 'wallet' | 'name' | 'alias'
+    displayName: text("display_name"),
+    listedOn: text("listed_on"), // date the entry was first listed (source-reported)
+    raw: jsonb("raw").notNull(), // full entry from the source, for human review
+    fetchedAt: timestamp("fetched_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_sanctions_pk").on(table.source, table.identifier),
+    index("idx_sanctions_lookup").on(table.identifierLower),
+    index("idx_sanctions_source").on(table.source),
+  ],
+);
+
+/**
+ * Immutable audit log of issuer overrides on sanctions-match screening.
+ * Every override is: an authenticated admin wallet explicitly approving
+ * a flagged register_holder despite a sanctions-list match, with a
+ * free-text justification. Never delete rows from this table.
+ */
+export const sanctionsOverrides = pgTable(
+  "sanctions_overrides",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    wallet: text("wallet").notNull(), // the holder wallet that matched
+    seriesMint: text("series_mint"),
+    matchedSources: text("matched_sources").array().notNull(), // e.g. ['ofac_sdn', 'uk_hmt']
+    matchedIdentifiers: jsonb("matched_identifiers").notNull(), // array of the raw sanctions entries
+    justification: text("justification").notNull(),
+    adminWallet: text("admin_wallet").notNull(),
+    adminSignature: text("admin_signature").notNull(), // proof the admin authorized this
+    status: text("status").notNull().default("active"), // 'active' | 'revoked'
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_sanctions_override_wallet").on(table.wallet),
+    index("idx_sanctions_override_admin").on(table.adminWallet),
+  ],
+);
+
 export const webhookEvents = pgTable("webhook_events", {
   txSignature: text("tx_signature").primaryKey(),
   eventType: text("event_type").notNull(),

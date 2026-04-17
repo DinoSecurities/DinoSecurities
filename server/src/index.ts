@@ -12,10 +12,23 @@ import { uploadDocument } from "./services/arweave.js";
 import { startSettlementAgent, runMatchingTick, debugFetch, getLastFetchBreakdown } from "./services/settlement-agent.js";
 import { cosignAndSubmit, getOraclePubkey } from "./services/oracle-signer.js";
 import { buildReceipt } from "./services/trade-receipt.js";
+import {
+  refreshAllSanctionsLists,
+  screenWallet,
+  isAdminWallet,
+} from "./services/sanctions.js";
 import { db } from "./db/index.js";
-import { settlementOrders, indexedSeries } from "./db/schema.js";
-import { eq } from "drizzle-orm";
+import {
+  settlementOrders,
+  indexedSeries,
+  sanctionsOverrides,
+} from "./db/schema.js";
+import { eq, desc } from "drizzle-orm";
+import nacl from "tweetnacl";
+import bs58 from "bs58";
+import { PublicKey } from "@solana/web3.js";
 import { env } from "./env.js";
+import { wss } from "./ws.js";
 
 const app = express();
 
@@ -177,6 +190,105 @@ app.post("/register-holder", coSignLimiter, async (req, res) => {
   }
 });
 
+// Sanctions-list admin endpoints. All require the WEBHOOK_SECRET in
+// the Authorization header — same bar as /admin/run-matching.
+function requireAdminAuth(req: express.Request): boolean {
+  const auth = req.header("authorization");
+  return Boolean(auth && auth.trim() === env.WEBHOOK_SECRET);
+}
+
+// Trigger a refresh of all three sanctions lists (OFAC SDN / EU /
+// UK HMT). Intended to be called by a scheduled cron (DO scheduler or
+// external), but also exposed for manual runs during setup.
+app.post("/admin/sanctions/refresh", async (req, res) => {
+  if (!requireAdminAuth(req)) return res.status(401).json({ error: "unauthorized" });
+  try {
+    const summary = await refreshAllSanctionsLists();
+    res.json({ refreshedAt: new Date().toISOString(), summary });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "refresh failed" });
+  }
+});
+
+// Screen a specific wallet on demand — useful during onboarding QA.
+app.get("/admin/sanctions/screen", async (req, res) => {
+  if (!requireAdminAuth(req)) return res.status(401).json({ error: "unauthorized" });
+  const wallet = String(req.query.wallet ?? "");
+  if (!wallet) return res.status(400).json({ error: "wallet required" });
+  try {
+    res.json(await screenWallet(wallet));
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "screen failed" });
+  }
+});
+
+// File an override: an authenticated admin wallet explicitly approves a
+// sanctions-flagged wallet for onboarding, with free-text justification.
+// The admin must sign a message containing the wallet + justification
+// so we can audit-log the authorization on-chain-equivalently.
+app.post("/admin/sanctions/override", express.json(), async (req, res) => {
+  try {
+    const {
+      wallet,
+      seriesMint = null,
+      justification,
+      adminWallet,
+      adminSignatureBase58,
+    } = req.body ?? {};
+    if (!wallet || !justification || !adminWallet || !adminSignatureBase58) {
+      return res.status(400).json({ error: "wallet, justification, adminWallet, adminSignatureBase58 required" });
+    }
+    if (!isAdminWallet(adminWallet)) {
+      return res.status(403).json({ error: "admin wallet not whitelisted" });
+    }
+    // The admin signed a deterministic message tying their identity to
+    // this override. Verify with tweetnacl.
+    const msg = `dinosecurities:sanctions-override:${wallet}:${seriesMint ?? "*"}:${justification}`;
+    const sig = bs58.decode(adminSignatureBase58);
+    const pub = new PublicKey(adminWallet).toBytes();
+    if (!nacl.sign.detached.verify(Buffer.from(msg), sig, pub)) {
+      return res.status(403).json({ error: "admin signature verification failed" });
+    }
+
+    const screen = await screenWallet(wallet);
+    const [row] = await db
+      .insert(sanctionsOverrides)
+      .values({
+        wallet,
+        seriesMint,
+        matchedSources: [...new Set(screen.hits.map((h) => h.source))],
+        matchedIdentifiers: screen.hits,
+        justification,
+        adminWallet,
+        adminSignature: adminSignatureBase58,
+        status: "active",
+      })
+      .returning();
+    console.log(
+      `[sanctions] override #${row.id} filed by ${adminWallet} for ${wallet} (${screen.hits.length} hits)`,
+    );
+    res.json({ id: row.id, status: row.status, createdAt: row.createdAt });
+  } catch (err: any) {
+    res.status(500).json({ error: err?.message ?? "override failed" });
+  }
+});
+
+// Revoke an active override. Same auth bar. Appends a status change to
+// the audit log instead of deleting the row — overrides are immutable
+// history by design.
+app.post("/admin/sanctions/override/:id/revoke", async (req, res) => {
+  if (!requireAdminAuth(req)) return res.status(401).json({ error: "unauthorized" });
+  const id = Number(req.params.id);
+  if (!Number.isFinite(id)) return res.status(400).json({ error: "invalid id" });
+  const [row] = await db
+    .update(sanctionsOverrides)
+    .set({ status: "revoked" })
+    .where(eq(sanctionsOverrides.id, id))
+    .returning();
+  if (!row) return res.status(404).json({ error: "override not found" });
+  res.json({ id: row.id, status: row.status });
+});
+
 // Admin endpoint to trigger a matching tick on demand — useful for testing
 // and for operators who want to kick the queue without waiting 30s.
 app.post("/admin/run-matching", async (req, res) => {
@@ -254,10 +366,21 @@ app.get("/receipts/:signature.pdf", async (req, res) => {
 
 app.get("/build", (_req, res) => res.json({ build: BUILD_MARKER, startedAt: new Date().toISOString() }));
 
-app.listen(env.PORT, () => {
+const server = app.listen(env.PORT, () => {
   console.log(`DinoSecurities API running on port ${env.PORT} [${BUILD_MARKER}]`);
   console.log(`  tRPC:     http://localhost:${env.PORT}/trpc`);
   console.log(`  Health:   http://localhost:${env.PORT}/health`);
   console.log(`  Webhooks: http://localhost:${env.PORT}/webhooks/helius`);
+  console.log(`  WS:       ws://localhost:${env.PORT}/ws/settlements`);
   startSettlementAgent();
+});
+
+server.on("upgrade", (req, socket, head) => {
+  if (req.url === "/ws/settlements") {
+    wss.handleUpgrade(req, socket, head, (ws) => {
+      wss.emit("connection", ws, req);
+    });
+  } else {
+    socket.destroy();
+  }
 });
