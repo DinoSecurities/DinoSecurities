@@ -1,6 +1,8 @@
 import { motion } from "framer-motion";
 import SectionWrapper from "./SectionWrapper";
 import CornerBrackets from "./CornerBrackets";
+import ClickToVerifyStat from "@/components/ClickToVerifyStat";
+import { useRecentSettlements } from "@/hooks/useRecentSettlements";
 
 const fadeUp = {
   initial: { opacity: 0, y: 40, filter: "blur(12px)" },
@@ -9,7 +11,30 @@ const fadeUp = {
   transition: { duration: 0.8 },
 };
 
-const PlatformSection = () => (
+const PlatformSection = () => {
+  const { data } = useRecentSettlements(5);
+  const latest = data?.items?.[0];
+  const avgFinalityMs = data?.aggregates?.avgFinalityMs;
+  const total = data?.aggregates?.totalSettlements ?? 0;
+
+  // Fall back to a plausible static number when we have no sample yet.
+  const finalityValue = latest?.finalityMs
+    ? latest.finalityMs < 1000
+      ? `${Math.round(latest.finalityMs)}ms`
+      : `${(latest.finalityMs / 1000).toFixed(1)}s`
+    : avgFinalityMs
+      ? `${Math.round(avgFinalityMs)}ms`
+      : "400ms";
+
+  const finalityCaption = latest?.finalityMs
+    ? "Latest mainnet settlement"
+    : avgFinalityMs
+      ? `Avg over ${data?.aggregates?.samplesWithFinality ?? 0} settlements`
+      : "Solana confirmation time";
+
+  const settlementsLabel = total > 0 ? `${total}` : "—";
+
+  return (
   <SectionWrapper>
     <div className="flex flex-col gap-10">
       {/* Header */}
@@ -174,10 +199,13 @@ const PlatformSection = () => (
                     FINALITY
                   </span>
                 </div>
-                <div>
-                  <div className="text-5xl font-semibold tracking-tighter text-foreground mb-1">400ms</div>
-                  <div className="text-xs font-medium text-primary-foreground/70">Solana Confirmation Time</div>
-                </div>
+                <ClickToVerifyStat
+                  value={finalityValue}
+                  label={latest?.finalityMs ? "Wall-clock order → settled" : "Solana confirmation time"}
+                  caption={finalityCaption}
+                  signature={latest?.signature}
+                  variant="light"
+                />
               </motion.div>
 
               <motion.div
@@ -188,20 +216,23 @@ const PlatformSection = () => (
                 <div className="flex justify-between items-start">
                   <span className="text-2xl text-background">◆</span>
                   <span className="text-xs font-semibold tracking-widest text-background/50 uppercase">
-                    UPTIME
+                    SETTLED
                   </span>
                 </div>
-                <div>
-                  <div className="text-5xl font-semibold tracking-tighter text-background mb-1">99.9%</div>
-                  <div className="text-xs font-medium text-background/60">Platform Availability</div>
-                </div>
-              </motion.div>
+                <ClickToVerifyStat
+                  value={settlementsLabel}
+                  label="Atomic DvP settlements on mainnet"
+                  caption={total > 0 ? "Every one verifiable on-chain" : "Awaiting first settlement"}
+                  signature={latest?.signature}
+                  variant="dark"
+                />
             </div>
           </div>
         </div>
       </div>
     </div>
   </SectionWrapper>
-);
+  );
+};
 
 export default PlatformSection;
