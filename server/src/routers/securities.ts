@@ -59,6 +59,23 @@ export const securitiesRouter = router({
       }
     }),
 
+  /**
+   * Resolve a security by its human ticker symbol — case-insensitive.
+   * Used by the embeddable issuer widget at /embed/:symbol so issuers
+   * can paste <iframe src="…/embed/DINOMT"> on their own sites without
+   * needing to look up a mint address.
+   */
+  getBySymbol: publicProcedure
+    .input(z.object({ symbol: z.string().min(1).max(16) }))
+    .query(async ({ ctx, input }) => {
+      const [result] = await ctx.db
+        .select()
+        .from(indexedSeries)
+        .where(eq(indexedSeries.symbol, input.symbol.toUpperCase()))
+        .limit(1);
+      return result ?? null;
+    }),
+
   getByIssuer: publicProcedure
     .input(z.object({ issuer: z.string() }))
     .query(async ({ ctx, input }) => {
