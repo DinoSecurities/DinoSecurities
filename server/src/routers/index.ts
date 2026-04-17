@@ -8,6 +8,7 @@ import { documentsRouter } from "./documents.js";
 import { analyticsRouter } from "./analytics.js";
 import { complianceRouter } from "./compliance.js";
 import { sanctionsRouter } from "./compliance-sanctions.js";
+import { webhooksRouter } from "./webhooks.js";
 
 export const appRouter = router({
   securities: securitiesRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   compliance: complianceRouter,
   sanctions: sanctionsRouter,
+  webhooks: webhooksRouter,
 });
 
 export type AppRouter = typeof appRouter;
