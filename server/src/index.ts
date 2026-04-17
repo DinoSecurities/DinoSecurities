@@ -289,6 +289,60 @@ app.post("/admin/sanctions/override/:id/revoke", async (req, res) => {
   res.json({ id: row.id, status: row.status });
 });
 
+// Bulk whitelist import — issuer uploads a CSV of holders on the
+// frontend, signs all the register_holder txs in one Phantom popup via
+// signAllTransactions, then POSTs them here. We loop through the array
+// calling the same cosignAndSubmit path /register-holder uses, so
+// sanctions screening and all validation logic runs identically per row.
+// Returns per-row result ({ rowIndex, success, signature | error }) so
+// the client can render a progress / status table.
+app.post("/admin/bulk-whitelist/submit", express.json({ limit: "10mb" }), async (req, res) => {
+  try {
+    const { txs } = req.body ?? {};
+    if (!Array.isArray(txs) || txs.length === 0) {
+      return res.status(400).json({ error: "txs array required" });
+    }
+    if (txs.length > 100) {
+      return res.status(400).json({ error: "max 100 txs per request — chunk client-side" });
+    }
+    const results: Array<{
+      rowIndex: number;
+      success: boolean;
+      signature?: string;
+      error?: string;
+      code?: string;
+    }> = [];
+    for (const entry of txs) {
+      const rowIndex = Number(entry?.rowIndex ?? -1);
+      const signedTxBase64 = entry?.signedTxBase64;
+      if (typeof signedTxBase64 !== "string") {
+        results.push({ rowIndex, success: false, error: "signedTxBase64 missing" });
+        continue;
+      }
+      try {
+        const { signature } = await cosignAndSubmit(signedTxBase64, "register_holder");
+        results.push({ rowIndex, success: true, signature });
+      } catch (err: any) {
+        results.push({
+          rowIndex,
+          success: false,
+          error: err?.message ?? "cosign failed",
+          code: err?.code,
+        });
+      }
+    }
+    const summary = {
+      total: txs.length,
+      succeeded: results.filter((r) => r.success).length,
+      failed: results.filter((r) => !r.success).length,
+    };
+    res.json({ summary, results });
+  } catch (err: any) {
+    console.error("[bulk-whitelist] failed:", err?.message ?? err);
+    res.status(500).json({ error: err?.message ?? "bulk submit failed" });
+  }
+});
+
 // Admin endpoint to trigger a matching tick on demand — useful for testing
 // and for operators who want to kick the queue without waiting 30s.
 app.post("/admin/run-matching", async (req, res) => {
