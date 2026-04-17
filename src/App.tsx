@@ -3,6 +3,7 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import ComplianceSimulator from "./pages/ComplianceSimulator.tsx";
 import AppLayout from "./components/dashboard/AppLayout.tsx";
 import Dashboard from "./pages/app/Dashboard.tsx";
 import Portfolio from "./pages/app/Portfolio.tsx";
@@ -28,6 +29,7 @@ const App = () => (
       <Routes>
         <Route path="/" element={<Index />} />
         <Route path="/xrp" element={<XRPLanding />} />
+        <Route path="/compliance" element={<ComplianceSimulator />} />
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="portfolio" element={<Portfolio />} />

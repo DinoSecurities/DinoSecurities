@@ -52,6 +52,7 @@ The transfer hook's validation logic — KYC recency, accreditation flag, freeze
 - **Real-Time Indexing** — Helius webhooks capture on-chain events into PostgreSQL
 - **Click-to-Verify Stats** — every performance number on the landing page links to the actual mainnet settlement tx that proves it. No marketing fluff, only on-chain truth.
 - **Client-Side Ricardian Verification** — on every SecurityDetail page the browser fetches the Arweave-stored governing document, SHA-256-hashes it locally, and compares to the on-chain `doc_hash`. Any investor can prove the legal document hasn't been substituted — no trust in the platform required.
+- **Pre-Trade Compliance Simulator** — a public page at `/compliance` that runs the exact Transfer Hook validation sequence off-chain, read-only, against any (wallet, mint) pair. Anyone can paste an address and see whether a transfer would succeed or revert, with a step-by-step pass/fail table. Reproducible from public on-chain state alone.
 
 ## Tech Stack
 
