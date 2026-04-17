@@ -54,6 +54,7 @@ The transfer hook's validation logic — KYC recency, accreditation flag, freeze
 - **Client-Side Ricardian Verification** — on every SecurityDetail page the browser fetches the Arweave-stored governing document, SHA-256-hashes it locally, and compares to the on-chain `doc_hash`. Any investor can prove the legal document hasn't been substituted — no trust in the platform required.
 - **Pre-Trade Compliance Simulator** — a public page at `/compliance` that runs the exact Transfer Hook validation sequence off-chain, read-only, against any (wallet, mint) pair. Anyone can paste an address and see whether a transfer would succeed or revert, with a step-by-step pass/fail table. Reproducible from public on-chain state alone.
 - **Trade-Confirmation PDF Receipts** — every settled atomic DvP generates a formal trade-confirmation document, rendered on demand at `/receipts/:signature.pdf`. Includes both counterparties, mint, quantity, unit price, consideration, settlement date, finality, fee, and a QR code linking back to the Solana Explorer tx. Downloadable from Portfolio → Activity.
+- **Embeddable Issuer Widget** — issuers paste a single `<iframe>` on their corporate website to display live series stats + an Invest CTA to their holders. Themeable (light / dark / custom accent), responsive, safe to embed on any origin. Snippet generator at `/embed`, widget itself at `/embed/:symbol`.
 
 ## Tech Stack
 

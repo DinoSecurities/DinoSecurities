@@ -11,6 +11,7 @@ const footerLinks = {
     { label: "Governance", href: "/app/governance" },
     { label: "KYC", href: "/app/settings" },
     { label: "Compliance Simulator", href: "/compliance" },
+    { label: "Embed Widget", href: "/embed" },
     { label: "Documentation", href: "https://github.com/DinoSecurities/DinoSecurities", external: true },
   ],
   Company: [
