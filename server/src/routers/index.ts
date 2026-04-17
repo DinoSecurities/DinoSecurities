@@ -6,6 +6,7 @@ import { kycRouter } from "./kyc.js";
 import { governanceRouter } from "./governance.js";
 import { documentsRouter } from "./documents.js";
 import { analyticsRouter } from "./analytics.js";
+import { complianceRouter } from "./compliance.js";
 
 export const appRouter = router({
   securities: securitiesRouter,
@@ -15,6 +16,7 @@ export const appRouter = router({
   governance: governanceRouter,
   documents: documentsRouter,
   analytics: analyticsRouter,
+  compliance: complianceRouter,
 });
 
 export type AppRouter = typeof appRouter;
