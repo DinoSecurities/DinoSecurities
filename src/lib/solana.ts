@@ -29,6 +29,7 @@ let _programIds: {
   SPL_GOVERNANCE: PublicKey;
   TOKEN_2022: PublicKey;
   USDC_MINT: PublicKey;
+  WXRP_MINT: PublicKey;
 } | null = null;
 
 export function getProgramIds() {
@@ -47,6 +48,9 @@ export function getProgramIds() {
       TOKEN_2022: new PublicKey("TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"),
       USDC_MINT: new PublicKey(
         import.meta.env.VITE_USDC_MINT || "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+      ),
+      WXRP_MINT: new PublicKey(
+        import.meta.env.VITE_WXRP_MINT || "6UpQcMAb5xMzxc7ZfPaVMgx3KqsvKZdT5U718BzD5We2",
       ),
     };
   }

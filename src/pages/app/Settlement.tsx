@@ -29,6 +29,7 @@ const Settlement = () => {
   const [tokenAmount, setTokenAmount] = useState("");
   const [paymentAmount, setPaymentAmount] = useState("");
   const [expiryHours, setExpiryHours] = useState("24");
+  const [paymentToken, setPaymentToken] = useState<"USDC" | "wXRP">("USDC");
 
   const securities = useIndexedSecurities();
   const seriesByMint = useMemo(
@@ -51,12 +52,15 @@ const Settlement = () => {
     if (!selectedMint) return toast.error("Pick a security first");
     setBusy(true);
     try {
+      const chosenMint = paymentToken === "wXRP"
+        ? PROGRAM_IDS.WXRP_MINT.toBase58()
+        : PROGRAM_IDS.USDC_MINT.toBase58();
+      // Both USDC and wXRP use 6 decimals on Solana
       const res = await createSettlementOrderOnChain(connection, wallet, {
         securityMint: selectedMint,
-        paymentMint: PROGRAM_IDS.USDC_MINT.toBase58(),
+        paymentMint: chosenMint,
         side,
         tokenAmount: BigInt(tokenAmount || "0"),
-        // USDC has 6 decimals on Solana; convert dollars to micro-USDC.
         paymentAmount: Math.round(Number(paymentAmount || "0") * 1_000_000),
         expiresInSeconds: Number(expiryHours) * 3600,
       });
@@ -302,7 +306,25 @@ const Settlement = () => {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Total USDC</label>
+                  <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Pay with</label>
+                <div className="mt-2 flex gap-2">
+                  {(["USDC", "wXRP"] as const).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setPaymentToken(t)}
+                      className={`flex-1 px-3 py-2 text-xs font-semibold uppercase tracking-widest transition-colors border ${
+                        paymentToken === t
+                          ? "bg-primary/20 border-primary/50 text-primary"
+                          : "bg-secondary border-border text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div>
+                <label className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Total {paymentToken}</label>
                   <input
                     type="number"
                     value={paymentAmount}

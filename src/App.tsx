@@ -18,6 +18,7 @@ import Settings from "./pages/app/Settings.tsx";
 import IssuerPortal from "./pages/app/IssuerPortal.tsx";
 import CreateSeries from "./pages/app/CreateSeries.tsx";
 import WalletModal from "./components/wallet/WalletModal.tsx";
+import XRPLanding from "./pages/XRPLanding.tsx";
 
 const App = () => (
   <TooltipProvider>
@@ -26,6 +27,7 @@ const App = () => (
     <BrowserRouter>
       <Routes>
         <Route path="/" element={<Index />} />
+        <Route path="/xrp" element={<XRPLanding />} />
         <Route path="/app" element={<AppLayout />}>
           <Route index element={<Dashboard />} />
           <Route path="portfolio" element={<Portfolio />} />

@@ -226,12 +226,13 @@ const PlatformSection = () => {
                   signature={latest?.signature}
                   variant="dark"
                 />
+              </motion.div>
             </div>
           </div>
         </div>
       </div>
     </div>
-  </SectionWrapper>
+    </SectionWrapper>
   );
 };
 

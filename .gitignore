@@ -27,6 +27,8 @@ dist-ssr
 server/.env
 server/drizzle
 IMPLEMENTATION_PLAN.md
+tech_updates.md
+xrp_research.md
 
 # Anchor / Solana
 programs/target

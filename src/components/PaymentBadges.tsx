@@ -8,7 +8,7 @@
  * `VITE_WXRP_MINT` to the env.
  */
 
-const WXRP_LIVE = false;
+const WXRP_LIVE = true;
 
 interface PaymentBadgesProps {
   /** Small variant — used inside modals / side panels. Default is the regular size. */
@@ -36,16 +36,22 @@ export default function PaymentBadges({
         <span className="font-semibold text-emerald-400">USDC</span>
       </div>
 
-      {/* wXRP — coming soon */}
+      {/* wXRP */}
       <div
-        className={`flex items-center gap-2 bg-secondary/60 border border-border ${badgeSize}`}
-        title="wXRP payments are coming soon"
+        className={`flex items-center gap-2 ${
+          WXRP_LIVE
+            ? "bg-emerald-500/10 border border-emerald-500/30"
+            : "bg-secondary/60 border border-border"
+        } ${badgeSize}`}
+        title={WXRP_LIVE ? "wXRP payments accepted" : "wXRP payments coming soon"}
       >
         <XRPIcon size={iconSize} />
-        <span className="font-semibold text-muted-foreground">wXRP</span>
-        <span className="text-[9px] uppercase tracking-widest text-muted-foreground/70 bg-muted/40 border border-border px-1.5 py-0.5">
-          Soon
-        </span>
+        <span className={`font-semibold ${WXRP_LIVE ? "text-emerald-400" : "text-muted-foreground"}`}>wXRP</span>
+        {!WXRP_LIVE && (
+          <span className="text-[9px] uppercase tracking-widest text-muted-foreground/70 bg-muted/40 border border-border px-1.5 py-0.5">
+            Soon
+          </span>
+        )}
       </div>
     </div>
   );
