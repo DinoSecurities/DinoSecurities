@@ -48,6 +48,7 @@ export const indexedHolders = pgTable(
     isAccredited: boolean("is_accredited").default(false).notNull(),
     isFrozen: boolean("is_frozen").default(false).notNull(),
     isRevoked: boolean("is_revoked").default(false).notNull(),
+    jurisdiction: text("jurisdiction").default("").notNull(),
     registeredAt: timestamp("registered_at").defaultNow().notNull(),
     indexedAt: timestamp("indexed_at").defaultNow().notNull(),
   },
