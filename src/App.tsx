@@ -18,6 +18,7 @@ import SanctionsOverrides from "./pages/app/SanctionsOverrides.tsx";
 import BulkWhitelist from "./pages/app/BulkWhitelist.tsx";
 import IssuerWebhooks from "./pages/app/IssuerWebhooks.tsx";
 import XrplCredentials from "./pages/app/XrplCredentials.tsx";
+import XrplWhitelist from "./pages/app/XrplWhitelist.tsx";
 import WalletModal from "./components/wallet/WalletModal.tsx";
 import XRPLanding from "./pages/XRPLanding.tsx";
 import Embed from "./pages/Embed.tsx";
@@ -46,6 +47,7 @@ const App = () => (
           <Route path="issue/bulk-whitelist/:mint" element={<BulkWhitelist />} />
           <Route path="issue/webhooks/:mint" element={<IssuerWebhooks />} />
           <Route path="issue/xrpl-credentials" element={<XrplCredentials />} />
+          <Route path="whitelist/xrpl/:mint" element={<XrplWhitelist />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
