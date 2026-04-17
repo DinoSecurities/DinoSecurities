@@ -9,6 +9,7 @@ import { analyticsRouter } from "./analytics.js";
 import { complianceRouter } from "./compliance.js";
 import { sanctionsRouter } from "./compliance-sanctions.js";
 import { webhooksRouter } from "./webhooks.js";
+import { xrplCredentialsRouter } from "./xrpl-credentials.js";
 
 export const appRouter = router({
   securities: securitiesRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   compliance: complianceRouter,
   sanctions: sanctionsRouter,
   webhooks: webhooksRouter,
+  xrplCredentials: xrplCredentialsRouter,
 });
 
 export type AppRouter = typeof appRouter;
