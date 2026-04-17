@@ -190,6 +190,51 @@ app.post("/register-holder", coSignLimiter, async (req, res) => {
   }
 });
 
+// Issuer approval path for holder-initiated XRPL-credential whitelist
+// requests. The request row already embeds the (xrplAddress, network) we
+// verified at submit time; the issuer signs the register_holder tx with
+// that holder's pubkey and posts it here. The cosigner re-runs the XRPL
+// credential check against the live ledger so a credential revoked
+// between submit and approve is caught, then completes the cosign + the
+// request row's status transitions to 'approved' with the tx signature.
+app.post("/register-holder/xrpl-credential", coSignLimiter, async (req, res) => {
+  try {
+    const { signedTxBase64, whitelistRequestId } = req.body ?? {};
+    if (typeof signedTxBase64 !== "string" || typeof whitelistRequestId !== "number") {
+      return res.status(400).json({ error: "signedTxBase64 and whitelistRequestId required" });
+    }
+    const { db } = await import("./db/index.js");
+    const { xrplWhitelistRequests } = await import("./db/schema.js");
+    const { eq } = await import("drizzle-orm");
+    const [request] = await db
+      .select()
+      .from(xrplWhitelistRequests)
+      .where(eq(xrplWhitelistRequests.id, whitelistRequestId))
+      .limit(1);
+    if (!request) return res.status(404).json({ error: "request not found" });
+    if (request.status !== "pending") {
+      return res.status(409).json({ error: `request is ${request.status}, not pending` });
+    }
+    const { signature } = await cosignAndSubmit(signedTxBase64, "register_holder", {
+      source: "xrpl_credential",
+      xrplAddress: request.xrplAddress,
+      network: request.network as "mainnet" | "testnet" | "devnet",
+    });
+    await db
+      .update(xrplWhitelistRequests)
+      .set({
+        status: "approved",
+        resolvedAt: new Date(),
+        resolvedTx: signature,
+      })
+      .where(eq(xrplWhitelistRequests.id, whitelistRequestId));
+    res.json({ signature, requestId: whitelistRequestId });
+  } catch (err: any) {
+    console.error("[register-holder/xrpl-credential] failed:", err?.message ?? err);
+    res.status(400).json({ error: err?.message ?? "co-sign failed", code: err?.code });
+  }
+});
+
 // Sanctions-list admin endpoints. All require the WEBHOOK_SECRET in
 // the Authorization header — same bar as /admin/run-matching.
 function requireAdminAuth(req: express.Request): boolean {

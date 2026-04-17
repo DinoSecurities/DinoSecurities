@@ -84,12 +84,29 @@ export interface CosignResult {
 export type AllowedDisc = "register_issuer" | "register_holder";
 
 /**
+ * Optional attestation describing *why* we trust this register_holder
+ * request in lieu of the implicit oracle trust that's the default. When
+ * present and source === 'xrpl_credential', the cosigner additionally
+ * requires a proved wallet binding from the holder to the claimed XRPL
+ * address and a currently-valid credential from a trusted issuer.
+ */
+export type KycAttestation =
+  | { source: "oracle" }
+  | {
+      source: "xrpl_credential";
+      xrplAddress: string;
+      network: "mainnet" | "testnet" | "devnet";
+      requiredType?: string;
+    };
+
+/**
  * Verify an instruction is a single call to dino_core with the expected
  * discriminator, then co-sign and submit.
  */
 export async function cosignAndSubmit(
   signedTxBase64: string,
   expected: AllowedDisc,
+  attestation: KycAttestation = { source: "oracle" },
 ): Promise<CosignResult> {
   const oracle = loadOracle();
   if (!oracle) throw new Error("oracle not configured");
@@ -139,6 +156,27 @@ export async function cosignAndSubmit(
     const holderBytes = ix.data.slice(8, 8 + 32);
     if (holderBytes.length === 32) {
       const holderWallet = new PublicKey(holderBytes).toBase58();
+
+      // XRPL-credential attestation path. Runs *before* sanctions so we
+      // reject early on missing binding or expired credential with a
+      // clear reason instead of lumping it under a generic failure.
+      if (attestation.source === "xrpl_credential") {
+        const { verifyXrplCredential } = await import("./xrpl-credentials.js");
+        const result = await verifyXrplCredential({
+          solanaWallet: holderWallet,
+          xrplAddress: attestation.xrplAddress,
+          network: attestation.network,
+          requiredType: attestation.requiredType,
+          checkedBy: "oracle-signer",
+        });
+        if (!result.clean) {
+          const err = new Error(
+            `xrpl_credential attestation failed: ${result.reason ?? "unknown"}`,
+          );
+          (err as any).code = "XRPL_CREDENTIAL_REJECTED";
+          throw err;
+        }
+      }
       const result = await screenWallet(holderWallet);
       if (!result.clean && !result.overrideActive) {
         // Pull the mint out of the ix accounts for the override record —

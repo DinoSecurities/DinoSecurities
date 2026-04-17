@@ -147,6 +147,95 @@ export async function registerHolder(
   return result.signature;
 }
 
+/**
+ * Same register_holder construction as above, but routed through the
+ * xrpl-credential approval endpoint. The backend re-runs the XRPL
+ * credential check against the live ledger before cosigning, and flips
+ * the matching xrpl_whitelist_requests row to 'approved' on success.
+ */
+export async function registerHolderViaXrplCredential(
+  connection: Connection,
+  wallet: WalletContextState,
+  params: RegisterHolderParams,
+  whitelistRequestId: number,
+): Promise<string> {
+  if (!wallet.publicKey || !wallet.signTransaction) throw new Error("wallet not connected");
+
+  const oraclePubkeyStr = import.meta.env.VITE_KYC_ORACLE_PUBKEY;
+  const registerUrl = import.meta.env.VITE_REGISTER_HOLDER_URL;
+  if (!oraclePubkeyStr || !registerUrl) {
+    throw new Error(
+      "Holder registration is not configured. Set VITE_KYC_ORACLE_PUBKEY and VITE_REGISTER_HOLDER_URL.",
+    );
+  }
+  const oraclePubkey = new PublicKey(oraclePubkeyStr);
+
+  const program = programFor(connection, wallet);
+  const mint = new PublicKey(params.mint);
+  const holder = new PublicKey(params.holderWallet);
+
+  const [platformPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("platform")],
+    PROGRAM_IDS.DINO_CORE,
+  );
+  const [holderPda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("holder"), mint.toBuffer(), holder.toBuffer()],
+    PROGRAM_IDS.DINO_CORE,
+  );
+
+  const ttl = (params.ttlDays ?? 365) * 24 * 3600;
+  const expiry = new anchor.BN(Math.floor(Date.now() / 1000) + ttl);
+  const kycHash = Array.from(
+    new Uint8Array(
+      await crypto.subtle.digest(
+        "SHA-256",
+        new TextEncoder().encode(`holder:${holder.toBase58()}:${mint.toBase58()}`),
+      ),
+    ),
+  );
+  const jurisdictionBytes: number[] = (() => {
+    const j = (params.jurisdiction ?? "US").padEnd(2, " ").slice(0, 2);
+    return [j.charCodeAt(0), j.charCodeAt(1)];
+  })();
+
+  const ix = await program.methods
+    .registerHolder(holder, kycHash, expiry, params.isAccredited, jurisdictionBytes)
+    .accountsStrict({
+      platform: platformPda,
+      holder: holderPda,
+      mint,
+      signer: oraclePubkey,
+      systemProgram: SystemProgram.programId,
+    })
+    .instruction();
+
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const tx = new Transaction().add(ix);
+  tx.feePayer = wallet.publicKey;
+  tx.recentBlockhash = blockhash;
+
+  const signed = await wallet.signTransaction(tx);
+  const serialized = signed
+    .serialize({ requireAllSignatures: false, verifySignatures: false })
+    .toString("base64");
+
+  // Derive the xrpl-credential endpoint from the stock register-holder URL
+  // by swapping the path suffix — saves an extra env var.
+  const xrplUrl = registerUrl.replace(/\/register-holder\b.*/, "/register-holder/xrpl-credential");
+
+  const res = await fetch(xrplUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ signedTxBase64: serialized, whitelistRequestId }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`XRPL-credential holder registration failed: ${res.status} ${text}`);
+  }
+  const result = (await res.json()) as { signature: string };
+  return result.signature;
+}
+
 export interface MintTokensParams {
   mint: string;
   recipient: string;
