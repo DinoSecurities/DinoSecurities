@@ -28,6 +28,10 @@ const envSchema = z.object({
   PINATA_SECRET_KEY: z.string().optional(),
   CORS_ORIGIN: z.string().default("http://localhost:8080"),
   ADMIN_WALLETS: z.string().default(""),
+  // Public base URL this API is served under — used to build absolute
+  // links to static artifacts (trade-confirmation PDFs, etc.) that the
+  // frontend can render in a new tab. Leave empty to return relative URLs.
+  PUBLIC_BASE_URL: z.string().default("https://squid-app-zj6jb.ondigitalocean.app"),
 });
 
 export const env = envSchema.parse(process.env);

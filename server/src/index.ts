@@ -11,6 +11,10 @@ import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
 import { uploadDocument } from "./services/arweave.js";
 import { startSettlementAgent, runMatchingTick, debugFetch, getLastFetchBreakdown } from "./services/settlement-agent.js";
 import { cosignAndSubmit, getOraclePubkey } from "./services/oracle-signer.js";
+import { buildReceipt } from "./services/trade-receipt.js";
+import { db } from "./db/index.js";
+import { settlementOrders, indexedSeries } from "./db/schema.js";
+import { eq } from "drizzle-orm";
 import { env } from "./env.js";
 
 const app = express();
@@ -189,6 +193,60 @@ app.post("/admin/run-matching", async (req, res) => {
 });
 
 const BUILD_MARKER = "v28bc88f-errorSamples";
+
+// Trade-confirmation PDF for a settled DvP tx. Streamed on demand —
+// we don't persist rendered PDFs; each request rebuilds from the
+// authoritative settlement row. 7-year SEC-style retention is implicit
+// because the underlying row is never deleted.
+app.get("/receipts/:signature.pdf", async (req, res) => {
+  try {
+    const signature = req.params.signature;
+    if (!signature || signature.length < 32) {
+      return res.status(400).json({ error: "invalid signature" });
+    }
+    const [row] = await db
+      .select()
+      .from(settlementOrders)
+      .where(eq(settlementOrders.txSignature, signature))
+      .limit(1);
+    if (!row || row.status !== "settled") {
+      return res.status(404).json({ error: "no settled order for that signature" });
+    }
+    const [series] = await db
+      .select()
+      .from(indexedSeries)
+      .where(eq(indexedSeries.mintAddress, row.securityMint))
+      .limit(1);
+
+    const pdf = await buildReceipt({
+      signature: row.txSignature!,
+      settledAt: row.settledAt ?? new Date(),
+      buyer: row.buyer,
+      seller: row.seller,
+      securityMint: row.securityMint,
+      securitySymbol: series?.symbol ?? null,
+      securityName: series?.name ?? null,
+      isin: series?.isin ?? null,
+      tokenAmount: row.tokenAmount,
+      usdcAmount: row.usdcAmount,
+      paymentMintLabel: "USDC — EPjFWdd5…wyTDt1v",
+      feeLamports: row.feeLamports,
+      finalityMs: row.finalityMs,
+      slot: row.settlementSlot,
+      restriction: series?.transferRestrictions ?? null,
+    });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader(
+      "Content-Disposition",
+      `inline; filename="DinoSecurities-${(series?.symbol ?? "receipt").toLowerCase()}-${signature.slice(0, 8)}.pdf"`,
+    );
+    res.setHeader("Cache-Control", "public, max-age=31536000, immutable");
+    res.send(pdf);
+  } catch (err) {
+    console.error("[receipt] render failed:", err);
+    res.status(500).json({ error: (err as Error)?.message ?? "render failed" });
+  }
+});
 
 app.get("/build", (_req, res) => res.json({ build: BUILD_MARKER, startedAt: new Date().toISOString() }));
 

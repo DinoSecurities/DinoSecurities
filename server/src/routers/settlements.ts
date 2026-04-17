@@ -1,7 +1,8 @@
 import { z } from "zod";
 import { eq, or, desc } from "drizzle-orm";
-import { router, protectedProcedure } from "../trpc.js";
+import { router, publicProcedure, protectedProcedure } from "../trpc.js";
 import { settlementOrders } from "../db/schema.js";
+import { env } from "../env.js";
 
 export const settlementsRouter = router({
   createOrder: protectedProcedure
@@ -59,6 +60,69 @@ export const settlementsRouter = router({
         buys: orders.filter((o) => o.buyer && !o.seller),
         sells: orders.filter((o) => o.seller && !o.buyer),
         matched: orders.filter((o) => o.buyer && o.seller),
+      };
+    }),
+
+  /**
+   * Public activity feed for a given wallet — settled orders where the
+   * wallet was the buyer or seller, each decorated with a downloadable
+   * trade-confirmation PDF URL. Used by the Portfolio Activity tab.
+   */
+  getMySettlements: publicProcedure
+    .input(z.object({ wallet: z.string().min(32).max(44), limit: z.number().min(1).max(100).default(50) }))
+    .query(async ({ ctx, input }) => {
+      const rows = await ctx.db
+        .select()
+        .from(settlementOrders)
+        .where(
+          or(
+            eq(settlementOrders.buyer, input.wallet),
+            eq(settlementOrders.seller, input.wallet),
+          ),
+        )
+        .orderBy(desc(settlementOrders.settledAt))
+        .limit(input.limit);
+
+      const base = env.PUBLIC_BASE_URL ?? "";
+      return rows.map((r) => ({
+        orderId: r.orderId,
+        role: r.buyer === input.wallet ? ("buyer" as const) : ("seller" as const),
+        mint: r.securityMint,
+        tokenAmount: r.tokenAmount,
+        usdcAmount: r.usdcAmount,
+        status: r.status,
+        txSignature: r.txSignature,
+        settledAt: r.settledAt?.toISOString() ?? null,
+        createdAt: r.createdAt?.toISOString() ?? null,
+        finalityMs: r.finalityMs,
+        receiptUrl:
+          r.status === "settled" && r.txSignature
+            ? `${base}/receipts/${r.txSignature}.pdf`
+            : null,
+      }));
+    }),
+
+  /**
+   * Download URL for the trade-confirmation PDF of a settled tx. Returns
+   * `{ available: false }` when the signature doesn't match any settled
+   * order, so the frontend can show "Receipt unavailable" instead of a
+   * broken link.
+   */
+  receiptUrl: publicProcedure
+    .input(z.object({ signature: z.string().min(32) }))
+    .query(async ({ ctx, input }) => {
+      const [row] = await ctx.db
+        .select({ sig: settlementOrders.txSignature, status: settlementOrders.status })
+        .from(settlementOrders)
+        .where(eq(settlementOrders.txSignature, input.signature))
+        .limit(1);
+      if (!row || row.status !== "settled" || !row.sig) {
+        return { available: false as const };
+      }
+      const base = env.PUBLIC_BASE_URL ?? "";
+      return {
+        available: true as const,
+        url: `${base}/receipts/${row.sig}.pdf`,
       };
     }),
 
