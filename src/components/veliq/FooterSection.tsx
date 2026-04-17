@@ -21,7 +21,7 @@ const footerLinks = {
   ],
   Network: [
     { label: "X / Twitter", href: "https://x.com/SecuritiesDino", external: true },
-    { label: "Telegram", href: "#", external: true },
+    { label: "Telegram", href: "https://t.me/DinoSecurities", external: true },
     { label: "GitHub", href: "https://github.com/DinoSecurities/DinoSecurities", external: true },
   ],
 };
