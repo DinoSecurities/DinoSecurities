@@ -204,8 +204,10 @@ async function fetchEuConsolidated(): Promise<Array<typeof sanctionsEntries.$inf
  * "Other Information" column from time to time.
  */
 async function fetchUkHmt(): Promise<Array<typeof sanctionsEntries.$inferInsert>> {
+  // OFSI publishes the live consolidated list as CSV on their Azure Blob
+  // storage. This is the authoritative source gov.uk links to.
   const url =
-    "https://assets.publishing.service.gov.uk/media/ConList.csv";
+    "https://ofsistorage.blob.core.windows.net/publishlive/2022format/ConList.csv";
   const res = await fetch(url, { headers: { "User-Agent": "DinoSecurities/1.0 (compliance)" } });
   if (!res.ok) throw new Error(`UK HMT fetch failed: ${res.status}`);
   const csv = await res.text();
