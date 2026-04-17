@@ -20,6 +20,7 @@ import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
 import { truncateAddress, getExplorerUrl, PROGRAM_IDS } from "@/lib/solana";
 import { registerHolder, mintTokens, setSeriesPause } from "@/lib/issuerActions";
 import SanctionsStatusPanel from "@/components/SanctionsStatusPanel";
+import XrplWhitelistRequestsPanel from "@/components/XrplWhitelistRequestsPanel";
 
 type ActionType = "holder" | "mint" | "pause";
 
@@ -303,6 +304,10 @@ const IssuerPortal = () => {
               </span>
               <span className="text-[10px] text-muted-foreground">Toggle transfers</span>
             </button>
+          </div>
+
+          <div className="mt-4">
+            <XrplWhitelistRequestsPanel seriesMint={selected.mintAddress} />
           </div>
         </div>
       )}
