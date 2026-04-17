@@ -9,6 +9,7 @@ import {
 } from "../db/schema.js";
 import { eq, sql } from "drizzle-orm";
 import { decodeProgramEvents, type DinoEvent } from "./event-decoder.js";
+import { dispatchEvent } from "../services/webhook-dispatcher.js";
 
 interface WebhookEvent {
   type?: string;
@@ -111,6 +112,10 @@ async function upsertHolder(d: any) {
       target: [indexedHolders.mintAddress, indexedHolders.wallet],
       set: { isAccredited: Boolean(d.isAccredited), isRevoked: false },
     });
+  void dispatchEvent(d.mint, "HolderRegistered", {
+    wallet: d.wallet,
+    isAccredited: Boolean(d.isAccredited),
+  });
 }
 
 async function revokeHolder(d: any) {
@@ -163,7 +168,7 @@ async function markSettled(d: any, signature?: string, event?: WebhookEvent) {
 
   for (const orderId of [d.buyOrder, d.sellOrder]) {
     const [existing] = await db
-      .select({ createdAt: settlementOrders.createdAt })
+      .select({ createdAt: settlementOrders.createdAt, securityMint: settlementOrders.securityMint })
       .from(settlementOrders)
       .where(eq(settlementOrders.orderId, orderId))
       .limit(1);
@@ -174,6 +179,21 @@ async function markSettled(d: any, signature?: string, event?: WebhookEvent) {
       .update(settlementOrders)
       .set({ ...base, ...(finalityMs !== null ? { finalityMs } : {}) })
       .where(eq(settlementOrders.orderId, orderId));
+    if (existing?.securityMint) {
+      void dispatchEvent(
+        existing.securityMint,
+        "SettlementExecuted",
+        {
+          orderId,
+          buyOrder: d.buyOrder,
+          sellOrder: d.sellOrder,
+          finalityMs,
+          feeLamports,
+          slot,
+        },
+        signature,
+      );
+    }
   }
 }
 
