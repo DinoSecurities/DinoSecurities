@@ -35,14 +35,14 @@ export async function handleWebhookEvent(event: WebhookEvent): Promise<void> {
   const events = decodeProgramEvents(logs);
   for (const evt of events) {
     try {
-      await dispatch(evt, event.signature);
+      await dispatch(evt, event.signature, event);
     } catch (err) {
       console.error(`handler error for ${evt.name}:`, err);
     }
   }
 }
 
-async function dispatch(evt: DinoEvent, signature?: string) {
+async function dispatch(evt: DinoEvent, signature?: string, event?: WebhookEvent) {
   switch (evt.name) {
     case "SeriesCreated":
       return upsertSeries(evt.data);
@@ -57,7 +57,7 @@ async function dispatch(evt: DinoEvent, signature?: string) {
     case "OrderCreated":
       return insertOrder(evt.data, signature);
     case "SettlementExecuted":
-      return markSettled(evt.data, signature);
+      return markSettled(evt.data, signature, event);
     case "ProposalCreated":
     case "RealmCreated":
       return upsertRealm(evt.data);
@@ -140,15 +140,41 @@ async function insertOrder(d: any, signature?: string) {
   }).onConflictDoNothing({ target: settlementOrders.orderId });
 }
 
-async function markSettled(d: any, signature?: string) {
-  await db
-    .update(settlementOrders)
-    .set({ status: "settled", settledAt: new Date(), txSignature: signature ?? null })
-    .where(eq(settlementOrders.orderId, d.buyOrder));
-  await db
-    .update(settlementOrders)
-    .set({ status: "settled", settledAt: new Date(), txSignature: signature ?? null })
-    .where(eq(settlementOrders.orderId, d.sellOrder));
+async function markSettled(d: any, signature?: string, event?: WebhookEvent) {
+  const settledAt = new Date();
+
+  // Pull perf metrics from the webhook event if present. Helius enhanced
+  // webhooks include meta.fee (lamports) and the transaction slot. We
+  // approximate finality as settledAt - createdAt of the matched buy-side
+  // order; Solana's own confirmed-finality is effectively 400ms but the
+  // number we show users is the wall-clock time from "order open" to
+  // "funds moved," which is the honest experience.
+  const feeLamports =
+    typeof (event?.meta as any)?.fee === "number" ? (event?.meta as any).fee : null;
+  const slot = typeof (event as any)?.slot === "number" ? (event as any).slot : null;
+
+  const base = {
+    status: "settled" as const,
+    settledAt,
+    txSignature: signature ?? null,
+    ...(feeLamports !== null ? { feeLamports } : {}),
+    ...(slot !== null ? { settlementSlot: slot } : {}),
+  };
+
+  for (const orderId of [d.buyOrder, d.sellOrder]) {
+    const [existing] = await db
+      .select({ createdAt: settlementOrders.createdAt })
+      .from(settlementOrders)
+      .where(eq(settlementOrders.orderId, orderId))
+      .limit(1);
+    const finalityMs = existing?.createdAt
+      ? Math.max(0, settledAt.getTime() - new Date(existing.createdAt).getTime())
+      : null;
+    await db
+      .update(settlementOrders)
+      .set({ ...base, ...(finalityMs !== null ? { finalityMs } : {}) })
+      .where(eq(settlementOrders.orderId, orderId));
+  }
 }
 
 // ==========================================================================

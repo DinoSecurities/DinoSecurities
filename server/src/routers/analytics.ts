@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { count, sum, eq, gte, sql } from "drizzle-orm";
+import { avg, count, desc, eq, gte, isNotNull, sum, sql } from "drizzle-orm";
 import { router, publicProcedure, protectedProcedure } from "../trpc.js";
 import { indexedSeries, indexedHolders, settlementOrders } from "../db/schema.js";
 
@@ -80,6 +80,69 @@ export const analyticsRouter = router({
         volume: Number(r.volume ?? 0),
         count: r.count,
       }));
+    }),
+
+  /**
+   * Last N successful settlements on mainnet, shaped for the click-to-verify
+   * widgets on the landing page. Each item links directly to the Solana
+   * Explorer tx so any claim we render on the marketing site is provable.
+   */
+  recentSettlements: publicProcedure
+    .input(z.object({ limit: z.number().min(1).max(25).default(5) }).optional())
+    .query(async ({ ctx, input }) => {
+      const limit = input?.limit ?? 5;
+      const rows = await ctx.db
+        .select({
+          signature: settlementOrders.txSignature,
+          settledAt: settlementOrders.settledAt,
+          finalityMs: settlementOrders.finalityMs,
+          feeLamports: settlementOrders.feeLamports,
+          slot: settlementOrders.settlementSlot,
+          usdcAmount: settlementOrders.usdcAmount,
+          tokenAmount: settlementOrders.tokenAmount,
+          mint: settlementOrders.securityMint,
+        })
+        .from(settlementOrders)
+        .where(eq(settlementOrders.status, "settled"))
+        .orderBy(desc(settlementOrders.settledAt))
+        .limit(limit);
+
+      // Headline aggregates rolled up over the returned window. Used by the
+      // PlatformSection to render "avg over last N" context under each stat.
+      const [agg] = await ctx.db
+        .select({
+          avgFinalityMs: avg(settlementOrders.finalityMs),
+          avgFeeLamports: avg(settlementOrders.feeLamports),
+          totalCount: count(),
+        })
+        .from(settlementOrders)
+        .where(eq(settlementOrders.status, "settled"));
+
+      const [withFinality] = await ctx.db
+        .select({ count: count() })
+        .from(settlementOrders)
+        .where(isNotNull(settlementOrders.finalityMs));
+
+      return {
+        items: rows
+          .filter((r) => r.signature)
+          .map((r) => ({
+            signature: r.signature as string,
+            settledAt: r.settledAt?.toISOString() ?? null,
+            finalityMs: r.finalityMs ?? null,
+            feeSol: r.feeLamports != null ? r.feeLamports / 1e9 : null,
+            slot: r.slot ?? null,
+            usdc: r.usdcAmount / 1e6,
+            tokens: r.tokenAmount,
+            mint: r.mint,
+          })),
+        aggregates: {
+          avgFinalityMs: agg?.avgFinalityMs ? Number(agg.avgFinalityMs) : null,
+          avgFeeSol: agg?.avgFeeLamports ? Number(agg.avgFeeLamports) / 1e9 : null,
+          totalSettlements: Number(agg?.totalCount ?? 0),
+          samplesWithFinality: Number(withFinality?.count ?? 0),
+        },
+      };
     }),
 
   portfolioHistory: protectedProcedure.query(async ({ ctx }) => {

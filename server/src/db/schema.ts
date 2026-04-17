@@ -69,6 +69,13 @@ export const settlementOrders = pgTable(
     usdcAmount: bigint("usdc_amount", { mode: "number" }).notNull(),
     status: text("status").notNull().default("pending"),
     txSignature: text("tx_signature"),
+    // Performance metrics captured on SettlementExecuted. Populated by the
+    // webhook handler from the confirmed tx's blockTime (finality) and
+    // meta.fee (lamports paid by the agent). These power the live
+    // click-to-verify numbers on the marketing landing page.
+    finalityMs: integer("finality_ms"),
+    feeLamports: bigint("fee_lamports", { mode: "number" }),
+    settlementSlot: bigint("settlement_slot", { mode: "number" }),
     createdAt: timestamp("created_at").defaultNow().notNull(),
     settledAt: timestamp("settled_at"),
   },
