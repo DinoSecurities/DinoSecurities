@@ -4,6 +4,7 @@ import {
   trustedXrplCredentialIssuers,
   xrplCredentialVerifications,
 } from "../db/schema.js";
+import { hasBinding } from "./xrpl-bindings.js";
 
 /**
  * XRPL Credentials (XLS-70d) verification. An alternate source of KYC
@@ -48,6 +49,13 @@ export interface VerifyInput {
   requiredType?: string; // hex-encoded credentialType; if omitted, any allowed type matches
   solanaWallet?: string;
   checkedBy?: string;
+  /**
+   * When true, skip the wallet-binding enforcement below. Admin-only
+   * ad-hoc verifications set this to `true` so they can probe any XRPL
+   * address without a proved binding. Everything else — in particular
+   * the register_holder integration — must leave this false.
+   */
+  skipBindingCheck?: boolean;
 }
 
 export interface VerifyResult {
@@ -137,6 +145,22 @@ export async function verifyXrplCredential(input: VerifyInput): Promise<VerifyRe
 
   if (trustedRows.length === 0) {
     return record({ clean: false, reason: "no trusted XRPL issuers configured for this network" });
+  }
+
+  if (!input.skipBindingCheck) {
+    if (!input.solanaWallet) {
+      return record({
+        clean: false,
+        reason: "solanaWallet required for binding-checked verification",
+      });
+    }
+    const bound = await hasBinding(input.solanaWallet, input.xrplAddress);
+    if (!bound) {
+      return record({
+        clean: false,
+        reason: "no proved binding between this Solana wallet and XRPL address",
+      });
+    }
   }
 
   let credentials: RawCredential[];
