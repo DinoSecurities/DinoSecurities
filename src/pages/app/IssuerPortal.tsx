@@ -12,6 +12,7 @@ import {
   Loader2,
   Lock,
   X,
+  Webhook,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PublicKey } from "@solana/web3.js";
@@ -264,6 +265,14 @@ const IssuerPortal = () => {
               <Users size={20} className="text-primary" />
               <span className="text-xs text-foreground font-medium">Bulk Import</span>
               <span className="text-[10px] text-muted-foreground">CSV → batch sign</span>
+            </Link>
+            <Link
+              to={`/app/issue/webhooks/${selected.mintAddress}`}
+              className="flex flex-col items-center gap-2 p-4 border border-border hover:bg-secondary/40 transition-colors"
+            >
+              <Webhook size={20} className="text-primary" />
+              <span className="text-xs text-foreground font-medium">Webhooks</span>
+              <span className="text-[10px] text-muted-foreground">Signed event push</span>
             </Link>
             <button
               onClick={() => setActiveAction("mint")}
