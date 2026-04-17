@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { CheckCheck, ArrowRight, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
+import SettlementTicker from "./SettlementTicker";
 
 const CONTRACT_ADDRESS = "6BUv6SWDDtyvzbYaUisPubfGpYxibr5hdbqcpv3Ypump";
 
@@ -158,6 +159,11 @@ const HeroSection = () => {
             <Copy size={12} className="text-muted-foreground" />
           )}
         </motion.button>
+      </div>
+
+      {/* Live settlement ticker */}
+      <div className="absolute bottom-0 left-0 right-0">
+        <SettlementTicker />
       </div>
     </section>
   );
