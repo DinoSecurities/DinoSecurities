@@ -1,11 +1,12 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowUpRight, ArrowDownRight, Download, Filter, Wallet, Inbox } from "lucide-react";
+import { ArrowUpRight, ArrowDownRight, Download, Filter, Wallet, Inbox, FileText, ExternalLink } from "lucide-react";
 import { Area, AreaChart, ResponsiveContainer, Tooltip, XAxis, YAxis, PieChart, Pie, Cell } from "recharts";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useMyTokenBalances } from "@/hooks/useTokenBalance";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
-import { truncateAddress } from "@/lib/solana";
+import { useMySettlements } from "@/hooks/useMySettlements";
+import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 
 interface Holding {
   mint: string;
@@ -24,10 +25,15 @@ const TYPE_COLORS: Record<string, string> = {
 };
 
 const Portfolio = () => {
-  const { connected } = useWallet();
+  const { connected, publicKey } = useWallet();
   const [activeTab, setActiveTab] = useState<"holdings" | "activity">("holdings");
   const balances = useMyTokenBalances();
   const securities = useIndexedSecurities();
+  const mySettlements = useMySettlements(publicKey?.toBase58() ?? null);
+  const seriesByMint = useMemo(
+    () => new Map((securities.data ?? []).map((s) => [s.mintAddress, s])),
+    [securities.data],
+  );
 
   const holdings: Holding[] = useMemo(() => {
     if (!balances.data || !securities.data) return [];
@@ -218,12 +224,86 @@ const Portfolio = () => {
         )}
 
         {activeTab === "activity" && (
-          <div className="border border-t-0 border-border p-12 flex flex-col items-center text-center gap-2">
-            <Inbox size={32} className="text-muted-foreground" />
-            <div className="text-sm font-medium text-foreground">Activity feed coming soon</div>
-            <p className="text-xs text-muted-foreground max-w-sm">
-              Settlements, transfers, and votes will appear here as Helius indexes them in real time.
-            </p>
+          <div className="border border-t-0 border-border">
+            {mySettlements.isLoading ? (
+              <div className="p-8 text-center text-sm text-muted-foreground">Loading activity…</div>
+            ) : !mySettlements.data || mySettlements.data.length === 0 ? (
+              <div className="p-12 flex flex-col items-center text-center gap-2">
+                <Inbox size={32} className="text-muted-foreground" />
+                <div className="text-sm font-medium text-foreground">No settled activity yet</div>
+                <p className="text-xs text-muted-foreground max-w-sm">
+                  Once an order settles, it'll show here with a downloadable trade-confirmation PDF.
+                </p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-border/50 bg-secondary/30">
+                      <th className="text-left p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Role</th>
+                      <th className="text-left p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Security</th>
+                      <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Amount</th>
+                      <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">USDC</th>
+                      <th className="text-left p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Settled</th>
+                      <th className="text-right p-4 text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Receipt</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {mySettlements.data.map((s) => {
+                      const sec = seriesByMint.get(s.mint);
+                      return (
+                        <tr key={s.orderId} className="border-b border-border/30 last:border-b-0 hover:bg-secondary/20 transition-colors">
+                          <td className="p-4">
+                            <span className={`inline-flex items-center gap-1 text-[10px] uppercase tracking-widest font-semibold ${
+                              s.role === "buyer" ? "text-emerald-400" : "text-amber-400"
+                            }`}>
+                              {s.role === "buyer" ? <ArrowDownRight size={12} /> : <ArrowUpRight size={12} />}
+                              {s.role === "buyer" ? "Bought" : "Sold"}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="text-sm font-medium text-foreground">{sec?.symbol ?? truncateAddress(s.mint)}</div>
+                            {sec?.name && <div className="text-xs text-muted-foreground mt-0.5">{sec.name}</div>}
+                          </td>
+                          <td className="p-4 text-right text-sm font-mono text-foreground">{s.tokenAmount.toLocaleString()}</td>
+                          <td className="p-4 text-right text-sm font-mono text-foreground">${(s.usdcAmount / 1e6).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td className="p-4 text-xs text-muted-foreground">
+                            {s.settledAt ? new Date(s.settledAt).toLocaleString() : "—"}
+                            {s.txSignature && (
+                              <a
+                                href={getExplorerUrl(s.txSignature, "tx")}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="ml-2 text-primary hover:underline inline-flex items-center gap-0.5"
+                                title="View on Solana Explorer"
+                              >
+                                tx <ExternalLink size={9} />
+                              </a>
+                            )}
+                          </td>
+                          <td className="p-4 text-right">
+                            {s.receiptUrl ? (
+                              <a
+                                href={s.receiptUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest font-semibold text-primary hover:underline"
+                                title="Download trade-confirmation PDF"
+                              >
+                                <FileText size={12} />
+                                Receipt
+                              </a>
+                            ) : (
+                              <span className="text-[10px] uppercase tracking-widest text-muted-foreground/50">—</span>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         )}
       </div>
