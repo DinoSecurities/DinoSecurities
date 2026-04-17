@@ -7,6 +7,7 @@ import { truncateAddress, getExplorerUrl } from "@/lib/solana";
 import { toast } from "sonner";
 import PaymentBadges from "@/components/PaymentBadges";
 import DocVerificationBadge from "@/components/DocVerificationBadge";
+import HolderGeoMap from "@/components/HolderGeoMap";
 
 const SecurityDetail = () => {
   const { mint } = useParams();
@@ -281,14 +282,16 @@ function HoldersTab({ mint }: { mint: string }) {
     );
   }
   return (
-    <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01]">
-      <div className="p-4 border-b border-border flex items-center gap-2">
-        <Users size={16} className="text-muted-foreground" />
-        <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-          {rows.length} holder{rows.length === 1 ? "" : "s"}
-        </span>
-      </div>
-      <div className="overflow-x-auto">
+    <div className="flex flex-col gap-4">
+      <HolderGeoMap holders={rows} />
+      <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01]">
+        <div className="p-4 border-b border-border flex items-center gap-2">
+          <Users size={16} className="text-muted-foreground" />
+          <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+            {rows.length} holder{rows.length === 1 ? "" : "s"}
+          </span>
+        </div>
+        <div className="overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-border/50 bg-secondary/30">
@@ -329,6 +332,7 @@ function HoldersTab({ mint }: { mint: string }) {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
