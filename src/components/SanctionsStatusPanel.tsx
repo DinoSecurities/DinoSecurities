@@ -95,6 +95,13 @@ export default function SanctionsStatusPanel() {
           No active overrides
         </div>
       )}
+
+      <Link
+        to="/app/issue/xrpl-credentials"
+        className="mt-2 block text-center text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+      >
+        Trust layer: XRPL credential issuers →
+      </Link>
     </div>
   );
 }
