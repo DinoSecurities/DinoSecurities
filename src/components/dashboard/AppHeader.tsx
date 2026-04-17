@@ -22,6 +22,7 @@ const mobileNav = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true },
   { to: "/app/portfolio", label: "Portfolio", icon: Briefcase },
   { to: "/app/marketplace", label: "Marketplace", icon: Store },
+  { to: "/app/governance", label: "Governance", icon: Vote },
   { to: "/app/settlement", label: "Settlement", icon: ArrowLeftRight },
   { to: "/app/issue", label: "Issuer Portal", icon: FileStack },
   { to: "/app/settings", label: "Settings", icon: Settings },

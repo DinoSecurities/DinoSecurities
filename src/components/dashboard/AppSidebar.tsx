@@ -16,7 +16,7 @@ const navItems = [
   { to: "/app", label: "Dashboard", icon: LayoutDashboard, end: true, disabled: false },
   { to: "/app/portfolio", label: "Portfolio", icon: Briefcase, disabled: false },
   { to: "/app/marketplace", label: "Marketplace", icon: Store, disabled: false },
-  { to: "/app/governance", label: "Governance", icon: Vote, disabled: true },
+  { to: "/app/governance", label: "Governance", icon: Vote, disabled: false },
   { to: "/app/settlement", label: "Settlement", icon: ArrowLeftRight, disabled: false },
   { to: "/app/issue", label: "Issuer Portal", icon: FileStack, disabled: false },
   { to: "/app/settings", label: "Settings", icon: Settings, disabled: false },

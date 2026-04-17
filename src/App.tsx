@@ -9,11 +9,7 @@ import Dashboard from "./pages/app/Dashboard.tsx";
 import Portfolio from "./pages/app/Portfolio.tsx";
 import Marketplace from "./pages/app/Marketplace.tsx";
 import SecurityDetail from "./pages/app/SecurityDetail.tsx";
-// Governance page is fully implemented but hidden while we verify the
-// realm + proposal + vote + execute flow end-to-end on mainnet.
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 import Governance from "./pages/app/Governance.tsx";
-import GovernanceComingSoon from "./pages/app/GovernanceComingSoon.tsx";
 import Settlement from "./pages/app/Settlement.tsx";
 import Settings from "./pages/app/Settings.tsx";
 import IssuerPortal from "./pages/app/IssuerPortal.tsx";
@@ -35,11 +31,7 @@ const App = () => (
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="marketplace" element={<Marketplace />} />
           <Route path="marketplace/:mint" element={<SecurityDetail />} />
-          {/* Governance is wired end-to-end but unverified on mainnet —
-              hidden from the sidebar and routed to a Coming Soon placeholder
-              until we've run the realm + proposal + vote + execute E2E.
-              Re-enable by restoring <Governance /> here. */}
-          <Route path="governance" element={<GovernanceComingSoon />} />
+          <Route path="governance" element={<Governance />} />
           <Route path="settlement" element={<Settlement />} />
           <Route path="settings" element={<Settings />} />
           <Route path="issue" element={<IssuerPortal />} />
