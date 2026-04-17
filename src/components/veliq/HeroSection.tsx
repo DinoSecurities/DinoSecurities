@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { CheckCheck, ArrowRight, Copy, Check } from "lucide-react";
 import { toast } from "sonner";
 
-const CONTRACT_ADDRESS = "XXXX";
+const CONTRACT_ADDRESS = "6BUv6SWDDtyvzbYaUisPubfGpYxibr5hdbqcpv3Ypump";
 
 const HeroSection = () => {
   const bgRef = useRef<HTMLDivElement>(null);
