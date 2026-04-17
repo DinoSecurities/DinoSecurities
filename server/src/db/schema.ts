@@ -9,6 +9,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const indexedSeries = pgTable(
   "indexed_series",
@@ -244,6 +245,61 @@ export const webhookEvents = pgTable("webhook_events", {
   processedAt: timestamp("processed_at"),
   receivedAt: timestamp("received_at").defaultNow().notNull(),
 });
+
+/**
+ * Allow-list of XRPL accounts we trust to issue KYC (and related) credentials
+ * under the XLS-70 Credentials standard. When a holder presents a credential
+ * on their XRPL address, we accept it as an alternate KYC attestation — in
+ * parallel to the platform's own KYC oracle — only if the credential's
+ * issuer address appears here and is active. `credentialTypes` is an allow-
+ * list of permitted credentialType hex strings (e.g. sha256 of "KYC-BASIC");
+ * an empty array means "any type from this issuer."
+ */
+export const trustedXrplCredentialIssuers = pgTable(
+  "trusted_xrpl_credential_issuers",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    xrplAddress: text("xrpl_address").notNull(),
+    displayName: text("display_name").notNull(),
+    credentialTypes: text("credential_types").array().notNull().default(sql`ARRAY[]::text[]`),
+    network: text("network").notNull().default("mainnet"), // 'mainnet' | 'testnet' | 'devnet'
+    active: boolean("active").notNull().default(true),
+    notes: text("notes"),
+    addedBy: text("added_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_trusted_xrpl_issuer_pk").on(table.xrplAddress, table.network),
+    index("idx_trusted_xrpl_issuer_active").on(table.active),
+  ],
+);
+
+/**
+ * Append-only audit log of every XRPL-credential verification the platform
+ * has performed. One row per verification attempt, whether it resolved to
+ * clean or dirty. Pairs with sanctions_overrides for a full compliance-
+ * decision history an auditor can read end-to-end.
+ */
+export const xrplCredentialVerifications = pgTable(
+  "xrpl_credential_verifications",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    solanaWallet: text("solana_wallet"),
+    xrplAddress: text("xrpl_address").notNull(),
+    xrplIssuer: text("xrpl_issuer"),
+    credentialType: text("credential_type"),
+    network: text("network").notNull(),
+    clean: boolean("clean").notNull(),
+    reason: text("reason"),
+    rawCredential: jsonb("raw_credential"),
+    checkedBy: text("checked_by"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_xrpl_verif_wallet").on(table.solanaWallet),
+    index("idx_xrpl_verif_address").on(table.xrplAddress),
+  ],
+);
 
 /**
  * Issuer-registered outbound webhook endpoints. One row per (series, URL).
