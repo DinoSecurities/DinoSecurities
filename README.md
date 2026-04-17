@@ -56,6 +56,7 @@ The transfer hook's validation logic — KYC recency, accreditation flag, freeze
 - **Trade-Confirmation PDF Receipts** — every settled atomic DvP generates a formal trade-confirmation document, rendered on demand at `/receipts/:signature.pdf`. Includes both counterparties, mint, quantity, unit price, consideration, settlement date, finality, fee, and a QR code linking back to the Solana Explorer tx. Downloadable from Portfolio → Activity.
 - **Embeddable Issuer Widget** — issuers paste a single `<iframe>` on their corporate website to display live series stats + an Invest CTA to their holders. Themeable (light / dark / custom accent), responsive, safe to embed on any origin. Snippet generator at `/embed`, widget itself at `/embed/:symbol`.
 - **Sanctions List Screening** — every `register_holder` co-sign request is screened against OFAC SDN, EU Consolidated, and UK HMT sanctions lists before the KYC oracle signs. Matches block the co-sign unless an authorized admin files an override with justification — logged immutably in an auditor-readable audit log at `/app/issue/overrides`.
+- **Bulk Whitelist Import** — issuers migrating from Carta or legacy systems upload a CSV of existing investors at `/app/issue/bulk-whitelist/:mint`. We validate every row, let the wallet sign all transactions in a single Phantom popup via `signAllTransactions`, then oracle-cosign + submit in chunks through the same sanctions-screened path single-row registration uses. 500-investor onboarding goes from days to minutes.
 
 ## Tech Stack
 
