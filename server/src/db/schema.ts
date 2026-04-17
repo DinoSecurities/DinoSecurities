@@ -275,6 +275,90 @@ export const trustedXrplCredentialIssuers = pgTable(
 );
 
 /**
+ * Short-lived challenges issued to prove ownership of an XRPL address
+ * from a specific Solana wallet. The holder requests a challenge, signs
+ * the nonce with their XRPL wallet, and posts the signature back — we
+ * verify and record the binding. Challenges are single-use and expire
+ * five minutes after issue.
+ */
+export const xrplBindingChallenges = pgTable(
+  "xrpl_binding_challenges",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    solanaWallet: text("solana_wallet").notNull(),
+    xrplAddress: text("xrpl_address").notNull(),
+    network: text("network").notNull(),
+    nonce: text("nonce").notNull().unique(),
+    expiresAt: timestamp("expires_at").notNull(),
+    consumedAt: timestamp("consumed_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_challenge_wallet").on(table.solanaWallet),
+    index("idx_challenge_xrpl").on(table.xrplAddress),
+  ],
+);
+
+/**
+ * Proved (Solana wallet, XRPL address) bindings. A row lands here only
+ * after a challenge was successfully signed by the claimed XRPL key and
+ * the derived address matched. Every downstream XRPL-credential check
+ * must reference a row in this table — without a binding, an attacker
+ * could claim any XRPL address that happens to hold a trusted credential.
+ */
+export const walletXrplBindings = pgTable(
+  "wallet_xrpl_bindings",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    solanaWallet: text("solana_wallet").notNull(),
+    xrplAddress: text("xrpl_address").notNull(),
+    xrplPublicKey: text("xrpl_public_key").notNull(),
+    keyType: text("key_type").notNull(), // 'ed25519' | 'secp256k1'
+    network: text("network").notNull(),
+    signature: text("signature").notNull(),
+    nonce: text("nonce").notNull(),
+    provedAt: timestamp("proved_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_binding_pk").on(table.solanaWallet, table.xrplAddress),
+    index("idx_binding_wallet").on(table.solanaWallet),
+    index("idx_binding_xrpl").on(table.xrplAddress),
+  ],
+);
+
+/**
+ * Pending holder-initiated whitelist requests that verified via an XRPL
+ * credential. The holder proves their binding and a trusted issuer's
+ * credential clears; an issuer then reviews the queue and one-click
+ * approves, at which point the normal register_holder path runs with
+ * kyc_source='xrpl_credential' so the audit trail points at the XRPL
+ * credential instead of the platform's own oracle check.
+ */
+export const xrplWhitelistRequests = pgTable(
+  "xrpl_whitelist_requests",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    seriesMint: text("series_mint").notNull(),
+    solanaWallet: text("solana_wallet").notNull(),
+    xrplAddress: text("xrpl_address").notNull(),
+    network: text("network").notNull(),
+    verificationId: integer("verification_id"), // fk to xrpl_credential_verifications.id
+    requestedJurisdiction: text("requested_jurisdiction"),
+    status: text("status").notNull().default("pending"), // pending | approved | rejected | expired
+    resolvedAt: timestamp("resolved_at"),
+    resolvedBy: text("resolved_by"),
+    resolvedTx: text("resolved_tx"),
+    rejectionReason: text("rejection_reason"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_whitelist_req_pk").on(table.seriesMint, table.solanaWallet),
+    index("idx_whitelist_req_status").on(table.status),
+    index("idx_whitelist_req_series").on(table.seriesMint),
+  ],
+);
+
+/**
  * Append-only audit log of every XRPL-credential verification the platform
  * has performed. One row per verification attempt, whether it resolved to
  * clean or dirty. Pairs with sanctions_overrides for a full compliance-
