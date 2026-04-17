@@ -18,6 +18,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
 import { truncateAddress, getExplorerUrl, PROGRAM_IDS } from "@/lib/solana";
 import { registerHolder, mintTokens, setSeriesPause } from "@/lib/issuerActions";
+import SanctionsStatusPanel from "@/components/SanctionsStatusPanel";
 
 type ActionType = "holder" | "mint" | "pause";
 
@@ -172,6 +173,9 @@ const IssuerPortal = () => {
           Create New Series
         </Link>
       </div>
+
+      {/* Compliance snapshot */}
+      <SanctionsStatusPanel />
 
       {/* Series Dashboard */}
       {issuerSeries.length === 0 ? (
