@@ -15,6 +15,7 @@ import Settings from "./pages/app/Settings.tsx";
 import IssuerPortal from "./pages/app/IssuerPortal.tsx";
 import CreateSeries from "./pages/app/CreateSeries.tsx";
 import SanctionsOverrides from "./pages/app/SanctionsOverrides.tsx";
+import BulkWhitelist from "./pages/app/BulkWhitelist.tsx";
 import WalletModal from "./components/wallet/WalletModal.tsx";
 import XRPLanding from "./pages/XRPLanding.tsx";
 import Embed from "./pages/Embed.tsx";
@@ -40,6 +41,7 @@ const App = () => (
           <Route path="issue" element={<IssuerPortal />} />
           <Route path="issue/create" element={<CreateSeries />} />
           <Route path="issue/overrides" element={<SanctionsOverrides />} />
+          <Route path="issue/bulk-whitelist/:mint" element={<BulkWhitelist />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
