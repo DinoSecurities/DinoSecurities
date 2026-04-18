@@ -15,6 +15,7 @@ import { dinoRouter } from "./dino.js";
 import { apiKeysRouter } from "./api-keys.js";
 import { dinoHandlesRouter } from "./dino-handles.js";
 import { issuerAccessRouter } from "./issuer-access.js";
+import { communityRouter } from "./community.js";
 
 export const appRouter = router({
   securities: securitiesRouter,
@@ -33,6 +34,7 @@ export const appRouter = router({
   apiKeys: apiKeysRouter,
   dinoHandles: dinoHandlesRouter,
   issuerAccess: issuerAccessRouter,
+  community: communityRouter,
 });
 
 export type AppRouter = typeof appRouter;
