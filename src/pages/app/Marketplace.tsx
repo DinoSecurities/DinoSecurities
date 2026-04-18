@@ -1,7 +1,10 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { Search, Filter, Grid3X3, List, Loader2, Inbox } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { Search, Filter, Grid3X3, List, Loader2, Inbox, Clock } from "lucide-react";
 import { useIndexedSecurities, type IndexedSecurity } from "@/hooks/useIndexedSecurities";
+import { useDinoTier } from "@/hooks/useDinoBalance";
+import { trpc } from "@/lib/trpc";
 
 type ViewMode = "grid" | "list";
 type SortKey = "name" | "supply" | "type";
@@ -22,9 +25,25 @@ const Marketplace = () => {
   const [filterOpen, setFilterOpen] = useState(false);
 
   const { data: securities = [], isLoading } = useIndexedSecurities();
+  const { tier } = useDinoTier();
+
+  // Mints with a scheduled public listing still in the future. Non-Gold
+  // callers don't see them in the main marketplace; Gold sees the full
+  // roster plus a "Upcoming" affordance linking to /marketplace/upcoming.
+  const previewing = useQuery({
+    queryKey: ["issuerAccess.currentlyPreviewing"],
+    queryFn: () => trpc.issuerAccess.currentlyPreviewing.query(),
+    staleTime: 60_000,
+  });
+  const previewSet = useMemo(
+    () => new Set((previewing.data ?? []).map((p) => p.mint)),
+    [previewing.data],
+  );
+  const isGold = tier.id >= 3;
 
   const filtered: IndexedSecurity[] = securities
     .filter((s) => {
+      if (!isGold && previewSet.has(s.mintAddress)) return false;
       if (filterType !== "all" && s.securityType !== filterType) return false;
       if (
         searchQuery &&
@@ -48,8 +67,16 @@ const Marketplace = () => {
         <div>
           <h2 className="text-2xl font-semibold text-foreground tracking-tight">Marketplace</h2>
           <p className="text-sm text-muted-foreground mt-1">
-            {isLoading ? "Loading…" : `${securities.length} securities indexed`}
+            {isLoading ? "Loading…" : `${filtered.length} securities indexed`}
           </p>
+          {isGold && previewing.data && previewing.data.length > 0 && (
+            <Link
+              to="/app/marketplace/upcoming"
+              className="mt-2 inline-flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-primary hover:underline"
+            >
+              <Clock size={11} /> {previewing.data.length} upcoming · Gold preview →
+            </Link>
+          )}
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center bg-secondary border border-border px-3 py-1.5 gap-2">

@@ -21,6 +21,7 @@ import XrplCredentials from "./pages/app/XrplCredentials.tsx";
 import XrplWhitelist from "./pages/app/XrplWhitelist.tsx";
 import SupplyReconciliation from "./pages/app/SupplyReconciliation.tsx";
 import DinoTiers from "./pages/app/DinoTiers.tsx";
+import MarketplaceUpcoming from "./pages/app/MarketplaceUpcoming.tsx";
 import WalletModal from "./components/wallet/WalletModal.tsx";
 import XRPLanding from "./pages/XRPLanding.tsx";
 import Embed from "./pages/Embed.tsx";
@@ -39,6 +40,7 @@ const App = () => (
           <Route index element={<Dashboard />} />
           <Route path="portfolio" element={<Portfolio />} />
           <Route path="marketplace" element={<Marketplace />} />
+          <Route path="marketplace/upcoming" element={<MarketplaceUpcoming />} />
           <Route path="marketplace/:mint" element={<SecurityDetail />} />
           <Route path="governance" element={<Governance />} />
           <Route path="settlement" element={<Settlement />} />
