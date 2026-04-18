@@ -145,4 +145,11 @@ export const DINO_FEE_SURFACES: Array<{
       "CSV bulk whitelist is free today. When per-holder processing fees ship (for sanctions screening + KYC oracle co-sign), $DINO holders pay the discounted rate.",
     status: "planned",
   },
+  {
+    id: "community-governance",
+    label: "Community governance (advisory)",
+    description:
+      "Bronze-tier holders vote on $DINO-weighted advisory proposals at /app/community/governance; Gold-tier holders can create them. Outcomes are non-binding polls on marketing, community grants, and feature priorities — they never execute on-chain and never touch regulated securities governance.",
+    status: "live",
+  },
 ];
