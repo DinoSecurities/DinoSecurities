@@ -10,6 +10,8 @@ import DocVerificationBadge from "@/components/DocVerificationBadge";
 import VerificationPanel from "@/components/VerificationPanel";
 import HolderGeoMap from "@/components/HolderGeoMap";
 import ConcentrationCard from "@/components/ConcentrationCard";
+import HolderName from "@/components/HolderName";
+import { useHandlesFor } from "@/hooks/useDinoHandles";
 
 const SecurityDetail = () => {
   const { mint } = useParams();
@@ -258,6 +260,8 @@ const SecurityDetail = () => {
 function HoldersTab({ mint }: { mint: string }) {
   const holders = useHoldersForMint(mint);
   const rows = holders.data ?? [];
+  const handles = useHandlesFor(rows.map((h) => h.wallet));
+  const handleMap = handles.data ?? {};
   if (holders.isLoading) {
     return (
       <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-12 text-center text-sm text-muted-foreground">
@@ -300,7 +304,9 @@ function HoldersTab({ mint }: { mint: string }) {
           <tbody>
             {rows.map((h, i) => (
               <tr key={h.pda ?? `${h.wallet}-${i}`} className="border-b border-border/30 hover:bg-secondary/20 transition-colors">
-                <td className="p-4 font-mono text-xs text-foreground">{truncateAddress(h.wallet)}</td>
+                <td className="p-4 text-xs text-foreground">
+                  <HolderName wallet={h.wallet} handleMap={handleMap} withAddress />
+                </td>
                 <td className="p-4 text-right text-xs text-muted-foreground hidden md:table-cell">{h.jurisdiction || "—"}</td>
                 <td className="p-4 text-right">
                   <span className={`text-[10px] uppercase tracking-widest font-semibold px-2 py-0.5 ${
