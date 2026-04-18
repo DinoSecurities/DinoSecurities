@@ -133,10 +133,10 @@ export const DINO_FEE_SURFACES: Array<{
   },
   {
     id: "rest-overage",
-    label: "REST API rate-limit overage",
+    label: "REST API rate-limit tier",
     description:
-      "Public /api/v1 endpoints are 60 req/min/IP at the free tier. Paid tiers lift to 300–1500 req/min; $DINO holders pay the paid-tier rate at a discount.",
-    status: "planned",
+      "Public /api/v1 endpoints default to 60 req/min/IP. Generate an API key from this page and attach it as Authorization: Bearer — your limit lifts to your $DINO tier's rate: Bronze 300, Silver 1200, Gold 3000 req/min. Tier is resolved live from your balance at request time.",
+    status: "live",
   },
   {
     id: "bulk-whitelist",
