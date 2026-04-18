@@ -237,6 +237,52 @@ export const sanctionsOverrides = pgTable(
 );
 
 /**
+ * Per-issuer branding. Settings apply to the issuer's embed widget
+ * (/embed/:symbol) and their section of the Issuer Portal. Every
+ * field is tier-gated by the platform — the tier check happens on
+ * write, so a wallet whose balance later drops keeps the branding
+ * they earned (squat-resistance via the entry bar, not ongoing tax).
+ */
+export const issuerBranding = pgTable(
+  "issuer_branding",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    issuerWallet: text("issuer_wallet").notNull(),
+    accentColor: text("accent_color"), // CSS hex, e.g. "#22c55e"; Bronze+
+    logoUri: text("logo_uri"), // arweave / https URL; Silver+
+    hideEmbedFooter: boolean("hide_embed_footer").notNull().default(false), // Gold-only
+    tierAtWrite: integer("tier_at_write").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_issuer_branding_wallet").on(table.issuerWallet),
+  ],
+);
+
+/**
+ * Scheduled public listing for a series. If set and in the future,
+ * non-Gold callers hitting the marketplace list don't see the series;
+ * Gold-tier holders see it in /app/marketplace/upcoming instead. No
+ * on-chain change — the series is created immediately; only the
+ * platform UI gates it.
+ */
+export const seriesPreviewListings = pgTable(
+  "series_preview_listings",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    seriesMint: text("series_mint").notNull(),
+    publicListingAt: timestamp("public_listing_at").notNull(),
+    scheduledBy: text("scheduled_by").notNull(),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_preview_series").on(table.seriesMint),
+    index("idx_preview_public_at").on(table.publicListingAt),
+  ],
+);
+
+/**
  * $DINO community handles. One wallet claims one handle; the handle
  * becomes the wallet's display name across the platform. Claim is
  * tier-gated — a wallet must hold at least Bronze ($DINO minBalance
