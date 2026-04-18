@@ -13,14 +13,17 @@ import {
   Lock,
   X,
   Webhook,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
 import { PublicKey } from "@solana/web3.js";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
 import { truncateAddress, getExplorerUrl, PROGRAM_IDS } from "@/lib/solana";
 import { registerHolder, mintTokens, setSeriesPause } from "@/lib/issuerActions";
+import { trpc } from "@/lib/trpc";
 import SanctionsStatusPanel from "@/components/SanctionsStatusPanel";
 import XrplWhitelistRequestsPanel from "@/components/XrplWhitelistRequestsPanel";
+import IssuerBrandingPanel from "@/components/IssuerBrandingPanel";
 
 type ActionType = "holder" | "mint" | "pause";
 
@@ -276,6 +279,39 @@ const IssuerPortal = () => {
               <span className="text-[10px] text-muted-foreground">Signed event push</span>
             </Link>
             <button
+              onClick={async () => {
+                const current = prompt(
+                  "Schedule this series as a Gold-only preview. Enter the public listing timestamp (YYYY-MM-DDTHH:mm, local time). Leave blank to clear any existing preview.",
+                  new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString().slice(0, 16),
+                );
+                if (current === null) return;
+                try {
+                  if (current.trim() === "") {
+                    await trpc.issuerAccess.clearPreview.mutate({ mint: selected.mintAddress });
+                    toast.success("Preview listing cleared. Series is public now.");
+                  } else {
+                    const when = new Date(current);
+                    if (isNaN(when.getTime())) {
+                      toast.error("Invalid timestamp.");
+                      return;
+                    }
+                    await trpc.issuerAccess.schedulePreview.mutate({
+                      mint: selected.mintAddress,
+                      publicListingAt: when.toISOString(),
+                    });
+                    toast.success(`Preview window set. Series public at ${when.toLocaleString()}.`);
+                  }
+                } catch (err: any) {
+                  toast.error(err?.message ?? "failed to schedule");
+                }
+              }}
+              className="flex flex-col items-center gap-2 p-4 border border-border hover:bg-secondary/40 transition-colors"
+            >
+              <Clock size={20} className="text-primary" />
+              <span className="text-xs text-foreground font-medium">Preview Listing</span>
+              <span className="text-[10px] text-muted-foreground">Gold-only early access</span>
+            </button>
+            <button
               onClick={() => setActiveAction("mint")}
               className="flex flex-col items-center gap-2 p-4 border border-border hover:bg-secondary/40 transition-colors"
             >
@@ -309,6 +345,12 @@ const IssuerPortal = () => {
           <div className="mt-4">
             <XrplWhitelistRequestsPanel seriesMint={selected.mintAddress} />
           </div>
+        </div>
+      )}
+
+      {connected && (
+        <div className="mt-6">
+          <IssuerBrandingPanel />
         </div>
       )}
 
