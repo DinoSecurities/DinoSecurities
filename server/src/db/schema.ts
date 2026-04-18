@@ -237,6 +237,37 @@ export const sanctionsOverrides = pgTable(
 );
 
 /**
+ * $DINO community handles. One wallet claims one handle; the handle
+ * becomes the wallet's display name across the platform. Claim is
+ * tier-gated — a wallet must hold at least Bronze ($DINO minBalance
+ * 100_000) at claim time. Handles are not auto-revoked when the
+ * balance drops — the row survives, but the tier-gated claim bar
+ * means squatting costs real token exposure upfront.
+ *
+ * Handles are case-insensitive at claim time (stored lowercased)
+ * but the original casing is preserved in `displayHandle` for the
+ * rendering path. The unique index guarantees one claim per handle.
+ */
+export const dinoHandles = pgTable(
+  "dino_handles",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    ownerWallet: text("owner_wallet").notNull(),
+    handle: text("handle").notNull(), // lowercased, for lookup
+    displayHandle: text("display_handle").notNull(), // as-typed
+    minTierAtClaim: integer("min_tier_at_claim").notNull(), // snapshot of tier id
+    balanceAtClaim: bigint("balance_at_claim", { mode: "number" }).notNull(),
+    releasedAt: timestamp("released_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_dino_handle_owner").on(table.ownerWallet),
+    uniqueIndex("idx_dino_handle_unique").on(table.handle),
+    index("idx_dino_handle_active").on(table.releasedAt),
+  ],
+);
+
+/**
  * Public REST API keys. Each key belongs to a single owner wallet;
  * the rate-limit tier applied to requests using the key is read
  * live-on-request from the owner's $DINO balance (cached briefly),
