@@ -12,6 +12,7 @@ import { webhooksRouter } from "./webhooks.js";
 import { xrplCredentialsRouter } from "./xrpl-credentials.js";
 import { adminRouter } from "./admin.js";
 import { dinoRouter } from "./dino.js";
+import { apiKeysRouter } from "./api-keys.js";
 
 export const appRouter = router({
   securities: securitiesRouter,
@@ -27,6 +28,7 @@ export const appRouter = router({
   xrplCredentials: xrplCredentialsRouter,
   admin: adminRouter,
   dino: dinoRouter,
+  apiKeys: apiKeysRouter,
 });
 
 export type AppRouter = typeof appRouter;
