@@ -236,6 +236,38 @@ export const sanctionsOverrides = pgTable(
   ],
 );
 
+/**
+ * Public REST API keys. Each key belongs to a single owner wallet;
+ * the rate-limit tier applied to requests using the key is read
+ * live-on-request from the owner's $DINO balance (cached briefly),
+ * so a holder who accumulates more $DINO gets the higher tier
+ * without rotating their key.
+ *
+ * The plaintext key is shown to the owner exactly once on creation;
+ * only the sha256 hash is persisted. `keyPrefix` is the first eight
+ * chars kept alongside the hash for display purposes — the dashboard
+ * shows "dino_live_abc123…" without needing the full key.
+ */
+export const apiKeys = pgTable(
+  "api_keys",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    ownerWallet: text("owner_wallet").notNull(),
+    keyPrefix: text("key_prefix").notNull(), // first 14 chars, e.g. "dino_live_abcd" for display
+    keyHash: text("key_hash").notNull(), // sha256 hex of the full key
+    label: text("label"),
+    active: boolean("active").notNull().default(true),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+    revokedAt: timestamp("revoked_at"),
+  },
+  (table) => [
+    uniqueIndex("idx_api_key_hash").on(table.keyHash),
+    index("idx_api_key_owner").on(table.ownerWallet),
+    index("idx_api_key_active").on(table.active),
+  ],
+);
+
 export const webhookEvents = pgTable("webhook_events", {
   txSignature: text("tx_signature").primaryKey(),
   eventType: text("event_type").notNull(),
