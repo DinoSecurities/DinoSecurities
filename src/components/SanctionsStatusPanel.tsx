@@ -102,6 +102,12 @@ export default function SanctionsStatusPanel() {
       >
         Trust layer: XRPL credential issuers →
       </Link>
+      <Link
+        to="/app/admin/reconciliation"
+        className="mt-1 block text-center text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors"
+      >
+        Admin: supply reconciliation →
+      </Link>
     </div>
   );
 }
