@@ -283,6 +283,63 @@ export const seriesPreviewListings = pgTable(
 );
 
 /**
+ * $DINO community-governance proposals. DELIBERATELY ISOLATED from
+ * every other governance surface on the platform:
+ *
+ *   - This table has NO foreign-key, join, or cross-reference to
+ *     gov_proposals / gov_realms / gov_votes (the on-chain securities-
+ *     governance indexer).
+ *   - Records here NEVER execute anything on-chain. No CPI, no signer,
+ *     no automatic treasury movement. Outcomes are advisory polls;
+ *     the platform team executes manually (or doesn't).
+ *   - Proposal type is a strict enum. No "generic on-chain action"
+ *     kind exists and none will be added without legal review.
+ *
+ * Separation is the whole feature. If you're adding a field that
+ * touches a security mint, issuer PDA, or on-chain program state,
+ * stop — that belongs in a different surface.
+ */
+export const communityProposals = pgTable(
+  "community_proposals",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    title: text("title").notNull(),
+    description: text("description").notNull(), // markdown
+    proposalType: text("proposal_type").notNull(), // enum enforced at write: marketing_budget | feature_request | community_grant | community_event | generic
+    createdBy: text("created_by").notNull(),
+    creatorBalanceAtCreation: bigint("creator_balance_at_creation", { mode: "number" }).notNull(),
+    creatorTierAtCreation: integer("creator_tier_at_creation").notNull(),
+    disclosureAck: boolean("disclosure_ack").notNull().default(false),
+    status: text("status").notNull().default("voting"), // voting | closed | canceled
+    votingEndsAt: timestamp("voting_ends_at").notNull(),
+    canceledAt: timestamp("canceled_at"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_community_proposal_status").on(table.status),
+    index("idx_community_proposal_creator").on(table.createdBy),
+    index("idx_community_proposal_type").on(table.proposalType),
+  ],
+);
+
+export const communityVotes = pgTable(
+  "community_votes",
+  {
+    id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+    proposalId: integer("proposal_id").notNull(),
+    voterWallet: text("voter_wallet").notNull(),
+    choice: text("choice").notNull(), // yes | no | abstain
+    weightAtVote: bigint("weight_at_vote", { mode: "number" }).notNull(), // $DINO UI-decimal balance at vote time
+    castAt: timestamp("cast_at").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idx_community_vote_pk").on(table.proposalId, table.voterWallet),
+    index("idx_community_vote_proposal").on(table.proposalId),
+    index("idx_community_vote_voter").on(table.voterWallet),
+  ],
+);
+
+/**
  * $DINO community handles. One wallet claims one handle; the handle
  * becomes the wallet's display name across the platform. Claim is
  * tier-gated — a wallet must hold at least Bronze ($DINO minBalance
