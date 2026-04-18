@@ -5,6 +5,7 @@ import rateLimit from "express-rate-limit";
 import multer from "multer";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { appRouter } from "./routers/index.js";
+import { mountRestV1 } from "./rest/v1.js";
 import { createContext } from "./context.js";
 import { heliusWebhookHandler } from "./webhooks/helius.js";
 import { onKYCComplete, getKYCProvider } from "./services/kyc-oracle.js";
@@ -135,6 +136,11 @@ app.use("/trpc", apiLimiter, createExpressMiddleware({
   router: appRouter,
   createContext,
 }));
+
+// Public unauthed REST gateway at /api/v1 — thin wrappers over the tRPC
+// routers above. Every handler is GET-only, CORS-open, rate-limited, and
+// cacheable. OpenAPI spec + Scalar docs ship under the same prefix.
+mountRestV1(app);
 
 // KYC oracle co-signing endpoints. Client partial-signs a tx containing
 // exactly one register_issuer / register_holder call, posts it here, we
