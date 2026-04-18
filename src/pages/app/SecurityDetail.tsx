@@ -9,6 +9,7 @@ import PaymentBadges from "@/components/PaymentBadges";
 import DocVerificationBadge from "@/components/DocVerificationBadge";
 import VerificationPanel from "@/components/VerificationPanel";
 import HolderGeoMap from "@/components/HolderGeoMap";
+import ConcentrationCard from "@/components/ConcentrationCard";
 
 const SecurityDetail = () => {
   const { mint } = useParams();
@@ -130,6 +131,7 @@ const SecurityDetail = () => {
                 </div>
               ))}
             </div>
+            <ConcentrationCard mint={s.mintAddress} />
             <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-6 flex flex-col gap-3">
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">On-Chain</span>
               <div className="flex items-center justify-between">
