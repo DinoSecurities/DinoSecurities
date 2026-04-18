@@ -1,0 +1,75 @@
+{
+  "name": "@dinosecurities/sdk",
+  "version": "0.1.0",
+  "description": "TypeScript SDK for DinoSecurities — Solana-native regulated securities. PDA derivation, instruction builders, typed tRPC client, bundled program IDLs.",
+  "type": "module",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./idl": {
+      "types": "./dist/idl.d.ts",
+      "import": "./dist/idl.js",
+      "require": "./dist/idl.cjs"
+    },
+    "./pdas": {
+      "types": "./dist/pdas.d.ts",
+      "import": "./dist/pdas.js",
+      "require": "./dist/pdas.cjs"
+    },
+    "./compliance": {
+      "types": "./dist/compliance.d.ts",
+      "import": "./dist/compliance.js",
+      "require": "./dist/compliance.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "idl",
+    "README.md"
+  ],
+  "scripts": {
+    "prebuild": "node -e \"require('node:fs').cpSync('../../src/idl', './idl', { recursive: true })\"",
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "solana",
+    "dinosecurities",
+    "tokenized-securities",
+    "token-2022",
+    "anchor",
+    "sdk"
+  ],
+  "author": "DinoSecurities",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/DinoSecurities/DinoSecurities.git",
+    "directory": "packages/sdk"
+  },
+  "homepage": "https://www.dinosecurities.com/",
+  "peerDependencies": {
+    "@coral-xyz/anchor": "^0.32.0",
+    "@solana/web3.js": "^1.98.0"
+  },
+  "dependencies": {
+    "@solana/spl-token": "^0.4.14",
+    "@trpc/client": "^11.1.0"
+  },
+  "devDependencies": {
+    "@coral-xyz/anchor": "^0.32.1",
+    "@solana/web3.js": "^1.98.4",
+    "tsup": "^8.3.0",
+    "typescript": "^5.8.3"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
