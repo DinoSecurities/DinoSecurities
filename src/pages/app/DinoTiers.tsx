@@ -10,6 +10,7 @@ import {
 } from "@/lib/dinoToken";
 import { truncateAddress } from "@/lib/solana";
 import ApiKeysPanel from "@/components/ApiKeysPanel";
+import HandleClaimPanel from "@/components/HandleClaimPanel";
 
 /**
  * $DINO Tiers page — the canonical surface explaining the memecoin's
@@ -182,6 +183,8 @@ const DinoTiers = () => {
           ))}
         </div>
       </div>
+
+      <HandleClaimPanel currentTierId={tier.id} />
 
       <ApiKeysPanel currentTierId={tier.id} />
 
