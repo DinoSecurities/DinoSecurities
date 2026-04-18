@@ -1,8 +1,10 @@
 import { useEffect, useMemo } from "react";
 import { useParams, useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { ArrowUpRight, ShieldCheck, Loader2 } from "lucide-react";
 import { useSecurityBySymbol } from "@/hooks/useSecurityBySymbol";
 import { truncateAddress } from "@/lib/solana";
+import { trpc } from "@/lib/trpc";
 
 /**
  * Embeddable issuer widget. Rendered at /embed/:symbol and designed to
@@ -25,6 +27,25 @@ const Embed = () => {
   const theme = params.get("theme") === "light" ? "light" : "dark";
   const sec = useSecurityBySymbol(symbol);
 
+  // Resolve the issuer's $DINO tier → look up their branding overrides
+  // so the embed renders with the issuer's accent, optional logo, and
+  // (Gold-tier) no "Powered by DinoSecurities" footer. All queries
+  // short-circuit when the series isn't loaded yet.
+  const issuerTier = useQuery({
+    queryKey: ["dino.issuerTierForSeries", sec.data?.mintAddress],
+    queryFn: () =>
+      trpc.dino.issuerTierForSeries.query({ mint: sec.data!.mintAddress }),
+    enabled: !!sec.data?.mintAddress,
+    staleTime: 5 * 60_000,
+  });
+  const issuerWallet = issuerTier.data?.issuerWallet ?? null;
+  const branding = useQuery({
+    queryKey: ["issuerAccess.branding", issuerWallet],
+    queryFn: () => trpc.issuerAccess.branding.query({ issuerWallet: issuerWallet! }),
+    enabled: !!issuerWallet && (issuerTier.data?.tier.id ?? 0) >= 1,
+    staleTime: 5 * 60_000,
+  });
+
   // Signal "noindex" to search engines — the widget is meant to be embedded
   // on third-party sites, not crawled as a canonical page.
   useEffect(() => {
@@ -39,7 +60,19 @@ const Embed = () => {
   const fg = theme === "light" ? "#0a0a0f" : "#fafafc";
   const muted = theme === "light" ? "#6b6b7a" : "#9997b0";
   const border = theme === "light" ? "#e3e3e8" : "#222227";
-  const primary = accent && /^#[0-9a-fA-F]{6}$/.test(accent) ? accent : "#8b5cf6";
+  // Precedence: URL override > issuer branding > default. Issuers who
+  // want a consistent embedded look set their accent once via /app/issue
+  // and every iframed widget picks it up automatically; the URL param
+  // is still honored for one-off overrides on specific pages.
+  const brandingAccent = branding.data?.accentColor ?? null;
+  const primary =
+    accent && /^#[0-9a-fA-F]{6}$/.test(accent)
+      ? accent
+      : brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent)
+      ? brandingAccent
+      : "#8b5cf6";
+  const issuerLogoUri = branding.data?.logoUri ?? null;
+  const hideFooter = branding.data?.hideEmbedFooter ?? false;
 
   const pct = useMemo(() => {
     if (!sec.data) return 0;
@@ -65,20 +98,39 @@ const Embed = () => {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="inline-block h-2 w-2" style={{ backgroundColor: primary, boxShadow: `0 0 10px ${primary}` }} />
-            <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: muted }}>
-              Powered by DinoSecurities
-            </span>
+            {issuerLogoUri ? (
+              <img
+                src={issuerLogoUri}
+                alt=""
+                className="h-5 w-5 object-contain"
+                style={{ filter: theme === "dark" ? "none" : "none" }}
+                onError={(e) => {
+                  (e.currentTarget as HTMLImageElement).style.display = "none";
+                }}
+              />
+            ) : (
+              <span
+                className="inline-block h-2 w-2"
+                style={{ backgroundColor: primary, boxShadow: `0 0 10px ${primary}` }}
+              />
+            )}
+            {!hideFooter && (
+              <span className="text-[10px] font-semibold uppercase tracking-[0.22em]" style={{ color: muted }}>
+                Powered by DinoSecurities
+              </span>
+            )}
           </div>
-          <a
-            href="https://www.dinosecurities.com/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] uppercase tracking-widest font-semibold opacity-70 hover:opacity-100"
-            style={{ color: muted }}
-          >
-            Learn →
-          </a>
+          {!hideFooter && (
+            <a
+              href="https://www.dinosecurities.com/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] uppercase tracking-widest font-semibold opacity-70 hover:opacity-100"
+              style={{ color: muted }}
+            >
+              Learn →
+            </a>
+          )}
         </div>
 
         {sec.isLoading && (
