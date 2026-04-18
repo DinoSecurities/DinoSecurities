@@ -92,6 +92,25 @@ const RESTRICTION_VARIANT: Record<RegulationUI, any> = {
   Ricardian: { ricardian: {} },
 };
 
+/**
+ * Priority-fee preamble. On mainnet, a tx without a compute-unit price
+ * can sit in the mempool while fee-paying txs are scheduled ahead of it
+ * — long enough for the recent blockhash to expire. Every tx this file
+ * constructs gets these two instructions prepended so the network has a
+ * reason to include them in the current slot window.
+ *
+ * Override via VITE_PRIORITY_FEE_MICROLAMPORTS if the default is off
+ * (e.g., devnet can drop to 1).
+ */
+function priorityFeeIxs(computeUnitLimit = 400_000): TransactionInstruction[] {
+  const raw = import.meta.env.VITE_PRIORITY_FEE_MICROLAMPORTS;
+  const microLamports = raw ? Math.max(0, parseInt(String(raw), 10) || 0) : 100_000;
+  return [
+    ComputeBudgetProgram.setComputeUnitLimit({ units: computeUnitLimit }),
+    ComputeBudgetProgram.setComputeUnitPrice({ microLamports }),
+  ];
+}
+
 export async function createSecuritySeriesOnChain(
   connection: Connection,
   wallet: WalletContextState,
@@ -179,7 +198,7 @@ export async function createSecuritySeriesOnChain(
     .instruction();
 
   const tx1 = new Transaction()
-    .add(ComputeBudgetProgram.setComputeUnitLimit({ units: 400_000 }))
+    .add(...priorityFeeIxs(400_000))
     .add(
       SystemProgram.createAccount({
         fromPubkey: issuer,
@@ -297,7 +316,7 @@ export async function createSecuritySeriesOnChain(
       })
       .instruction();
 
-    const tx2 = new Transaction().add(registerIx);
+    const tx2 = new Transaction().add(...priorityFeeIxs(200_000)).add(registerIx);
     tx2.feePayer = issuer;
     tx2.recentBlockhash = (await connection.getLatestBlockhash("confirmed")).blockhash;
 
@@ -343,7 +362,7 @@ export async function createSecuritySeriesOnChain(
       systemProgram: SystemProgram.programId,
     })
     .instruction();
-  const tx3 = new Transaction().add(createIx);
+  const tx3 = new Transaction().add(...priorityFeeIxs(200_000)).add(createIx);
   const sig3 = await sendAndConfirm(connection, wallet, tx3, [], "create series");
 
   return {
@@ -384,32 +403,47 @@ async function sendAndConfirm(
   label: string,
 ): Promise<string> {
   if (!wallet.publicKey || !wallet.signTransaction) throw new Error("wallet missing");
-  // Fresh blockhash via "processed" bypasses the preflight cache's
-  // "already processed" false-positives on retried flows.
+  // "confirmed" commitment gives a blockhash the network actually agrees
+  // on — "processed" is ahead of consensus on mainnet and shrinks the
+  // usable window before the tx can even be sent.
   const { blockhash, lastValidBlockHeight } = await withRetry(
     `${label} blockhash`,
-    () => connection.getLatestBlockhash("processed"),
+    () => connection.getLatestBlockhash("confirmed"),
   );
   tx.recentBlockhash = blockhash;
   tx.feePayer = wallet.publicKey;
   for (const s of extraSigners) tx.partialSign(s);
   const signed = await wallet.signTransaction(tx);
+  const raw = signed.serialize();
+
+  // Initial submission. After this, keep re-broadcasting the same
+  // serialized bytes every 2s until either confirmation resolves or the
+  // block-height window closes. A single sendRawTransaction is not
+  // enough on mainnet under load — dropped sends are silent and you
+  // only find out via a blockhash-expired error 60s later.
   const sig = await withRetry(`${label} send`, () =>
-    connection.sendRawTransaction(signed.serialize(), {
-      skipPreflight: true,
-      maxRetries: 3,
-    }),
+    connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 3 }),
   );
-  const conf = await withRetry(`${label} confirm`, () =>
-    connection.confirmTransaction(
+
+  let resendTimer: ReturnType<typeof setInterval> | undefined;
+  try {
+    resendTimer = setInterval(() => {
+      connection.sendRawTransaction(raw, { skipPreflight: true, maxRetries: 0 }).catch(() => {
+        // Swallow resend errors; confirmTransaction is the source of truth.
+      });
+    }, 2000);
+
+    const conf = await connection.confirmTransaction(
       { signature: sig, blockhash, lastValidBlockHeight },
       "confirmed",
-    ),
-  );
-  if (conf.value.err) {
-    throw new Error(`[${label}] tx ${sig} reverted: ${JSON.stringify(conf.value.err)}`);
+    );
+    if (conf.value.err) {
+      throw new Error(`[${label}] tx ${sig} reverted: ${JSON.stringify(conf.value.err)}`);
+    }
+    return sig;
+  } finally {
+    if (resendTimer) clearInterval(resendTimer);
   }
-  return sig;
 }
 
 /**
