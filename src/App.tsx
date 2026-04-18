@@ -22,6 +22,9 @@ import XrplWhitelist from "./pages/app/XrplWhitelist.tsx";
 import SupplyReconciliation from "./pages/app/SupplyReconciliation.tsx";
 import DinoTiers from "./pages/app/DinoTiers.tsx";
 import MarketplaceUpcoming from "./pages/app/MarketplaceUpcoming.tsx";
+import CommunityGovernance from "./pages/app/CommunityGovernance.tsx";
+import CommunityProposalDetail from "./pages/app/CommunityProposalDetail.tsx";
+import CommunityProposalNew from "./pages/app/CommunityProposalNew.tsx";
 import WalletModal from "./components/wallet/WalletModal.tsx";
 import XRPLanding from "./pages/XRPLanding.tsx";
 import Embed from "./pages/Embed.tsx";
@@ -54,6 +57,9 @@ const App = () => (
           <Route path="whitelist/xrpl/:mint" element={<XrplWhitelist />} />
           <Route path="admin/reconciliation" element={<SupplyReconciliation />} />
           <Route path="dino" element={<DinoTiers />} />
+          <Route path="community/governance" element={<CommunityGovernance />} />
+          <Route path="community/governance/new" element={<CommunityProposalNew />} />
+          <Route path="community/governance/:id" element={<CommunityProposalDetail />} />
         </Route>
         <Route path="*" element={<NotFound />} />
       </Routes>
