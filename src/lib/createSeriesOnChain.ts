@@ -68,6 +68,13 @@ export interface CreateSeriesParams {
    * should hash it client-side and pass the 32-byte hash here.
    */
   docHash?: Uint8Array;
+  /**
+   * Optional pre-ground mint keypair. When supplied, skip the usual
+   * Keypair.generate() and use this one instead — powers the $DINO
+   * vanity-prefix feature where the UI grinds a keypair whose pubkey
+   * starts with a chosen prefix.
+   */
+  mintKeypair?: Keypair;
 }
 
 export interface CreateSeriesResult {
@@ -136,7 +143,7 @@ export async function createSecuritySeriesOnChain(
   );
 
   // ---- PDAs ---------------------------------------------------------------
-  const mintKeypair = Keypair.generate();
+  const mintKeypair = params.mintKeypair ?? Keypair.generate();
   const mint = mintKeypair.publicKey;
 
   const [platformPda] = anchor.web3.PublicKey.findProgramAddressSync(

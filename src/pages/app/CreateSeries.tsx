@@ -17,6 +17,9 @@ import { toast } from "sonner";
 import { createSecuritySeriesOnChain, hashFile } from "@/lib/createSeriesOnChain";
 import { uploadLegalDocument } from "@/lib/uploadDocument";
 import { getExplorerUrl, truncateAddress } from "@/lib/solana";
+import { grindMintKeypair, expectedAttempts } from "@/lib/vanityMint";
+import { useDinoTier } from "@/hooks/useDinoBalance";
+import type { Keypair } from "@solana/web3.js";
 
 type Step = 1 | 2 | 3 | 4 | 5;
 
@@ -33,6 +36,7 @@ const CreateSeries = () => {
   const wallet = useWallet();
   const { connection } = useConnection();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dino = useDinoTier();
 
   const [step, setStep] = useState<Step>(1);
   // Tracks whether the user has attempted to advance from step 2. Before
@@ -65,6 +69,10 @@ const CreateSeries = () => {
     // Document upload state
     uploading: false,
     uploadError: "",
+    // $DINO vanity mint prefix (Silver-2-char / Gold-3-char)
+    vanityPrefix: "",
+    grinding: false,
+    grindAttempts: 0,
   });
 
   const handleFile = async (file: File | null) => {
@@ -162,6 +170,27 @@ const CreateSeries = () => {
           ? await hashFile(formData.legalDocFile)
           : undefined;
 
+      // Optionally pre-grind a vanity mint keypair. Short prefixes
+      // (2 chars) average ~1500 attempts; 3 chars ~200K, 4 chars ~12M.
+      // The grind yields every 5000 attempts so the UI stays alive.
+      let mintKeypair: Keypair | undefined;
+      if (formData.vanityPrefix) {
+        updateField("grinding", true);
+        updateField("grindAttempts", 0);
+        try {
+          const result = await grindMintKeypair({
+            prefix: formData.vanityPrefix,
+            onProgress: (n) => updateField("grindAttempts", n),
+          });
+          mintKeypair = result.keypair;
+          toast.success(
+            `Vanity mint found after ${result.attempts.toLocaleString()} attempts: ${result.keypair.publicKey.toBase58().slice(0, 10)}…`,
+          );
+        } finally {
+          updateField("grinding", false);
+        }
+      }
+
       const result = await createSecuritySeriesOnChain(connection, wallet, {
         name: formData.name,
         symbol: formData.symbol,
@@ -172,6 +201,7 @@ const CreateSeries = () => {
         regulation: formData.regulation,
         docUri: formData.docUri || undefined,
         docHash,
+        mintKeypair,
       });
 
       toast.success(`Series live! Mint: ${truncateAddress(result.mintAddress)}`);
@@ -498,6 +528,49 @@ const CreateSeries = () => {
                   <h3 className="text-lg font-semibold text-foreground">Ready to Deploy</h3>
                   <p className="text-sm text-muted-foreground mt-1">This will submit a transaction to Solana.</p>
                 </div>
+
+                {/* $DINO vanity mint prefix */}
+                <div className="w-full max-w-md border border-border bg-secondary/20 p-4 flex flex-col gap-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                      Vanity mint prefix
+                    </span>
+                    <span
+                      className={`text-[9px] uppercase tracking-widest font-semibold px-1.5 py-0.5 ${
+                        dino.tier.id >= 2
+                          ? "text-primary bg-primary/10 border border-primary/30"
+                          : "text-muted-foreground bg-secondary/30 border border-border"
+                      }`}
+                    >
+                      {dino.tier.id >= 3
+                        ? "Gold · up to 3 chars"
+                        : dino.tier.id >= 2
+                        ? "Silver · 2 chars"
+                        : "Silver required"}
+                    </span>
+                  </div>
+                  <input
+                    disabled={dino.tier.id < 2}
+                    value={formData.vanityPrefix}
+                    onChange={(e) => {
+                      const max = dino.tier.id >= 3 ? 3 : 2;
+                      updateField(
+                        "vanityPrefix",
+                        e.target.value.replace(/[^A-HJ-NP-Za-km-z1-9]/g, "").slice(0, max),
+                      );
+                    }}
+                    placeholder={dino.tier.id >= 3 ? "e.g. 'dNo'" : dino.tier.id >= 2 ? "e.g. 'dN'" : "Silver tier required"}
+                    className="bg-background border border-border px-3 py-2 text-sm font-mono disabled:opacity-40"
+                  />
+                  {formData.vanityPrefix && (
+                    <div className="text-[10px] text-muted-foreground">
+                      Grind expected: ~{expectedAttempts(formData.vanityPrefix.length).toLocaleString()}{" "}
+                      attempts before the deploy starts
+                      {formData.vanityPrefix.length >= 3 ? " (can take minutes)" : ""}
+                    </div>
+                  )}
+                </div>
+
                 <button
                   onClick={handleDeploy}
                   className="px-8 py-3 bg-primary text-primary-foreground text-sm font-semibold uppercase tracking-widest hover:bg-primary/90 transition-colors"
@@ -505,6 +578,17 @@ const CreateSeries = () => {
                   Deploy Security Series
                 </button>
               </>
+            )}
+            {formData.grinding && (
+              <div className="w-full max-w-md border border-border p-4 flex items-center gap-3">
+                <Loader2 size={14} className="animate-spin text-primary" />
+                <div className="text-xs text-muted-foreground">
+                  Grinding vanity prefix{" "}
+                  <span className="font-mono text-foreground">{formData.vanityPrefix}</span>…{" "}
+                  <span className="text-foreground">{formData.grindAttempts.toLocaleString()}</span>{" "}
+                  attempts
+                </div>
+              </div>
             )}
             {formData.deploying && (
               <>
