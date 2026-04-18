@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { router, publicProcedure } from "../trpc.js";
 import { dinoTierFor, DINO_TIERS } from "../services/dino-balance.js";
+import { issuerTierForSeries } from "../services/issuer-resolver.js";
 
 /**
  * Public read surface for $DINO tier lookups. Any caller can ask what
@@ -34,4 +35,18 @@ export const dinoRouter = router({
       discountPct: t.discountPct,
     }));
   }),
+
+  issuerTierForSeries: publicProcedure
+    .input(z.object({ mint: z.string() }))
+    .query(async ({ input }) => {
+      const result = await issuerTierForSeries(input.mint);
+      return {
+        mint: result.mint,
+        issuerWallet: result.issuerWallet,
+        tier: result.tier,
+        supported: result.supported,
+        handleDisplay: result.handleDisplay,
+        checkedAt: result.checkedAt,
+      };
+    }),
 });
