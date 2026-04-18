@@ -15,6 +15,7 @@ import StatCard from "@/components/dashboard/StatCard";
 import { NETWORK } from "@/providers/SolanaProvider";
 import { useMyTokenBalances } from "@/hooks/useTokenBalance";
 import { useIndexedSecurities } from "@/hooks/useIndexedSecurities";
+import DinoTierBadge from "@/components/DinoTierBadge";
 
 const Dashboard = () => {
   const { connected } = useWallet();
@@ -137,6 +138,7 @@ const Dashboard = () => {
         </div>
 
         <div className="xl:col-span-5 flex flex-col gap-4">
+          <DinoTierBadge />
           <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01]">
             <div className="p-4 border-b border-border flex items-center justify-between">
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Active Proposals</span>
