@@ -12,6 +12,7 @@ import HolderGeoMap from "@/components/HolderGeoMap";
 import ConcentrationCard from "@/components/ConcentrationCard";
 import HolderName from "@/components/HolderName";
 import { useHandlesFor } from "@/hooks/useDinoHandles";
+import SeriesSupportBadge from "@/components/SeriesSupportBadge";
 
 const SecurityDetail = () => {
   const { mint } = useParams();
@@ -133,6 +134,7 @@ const SecurityDetail = () => {
                 </div>
               ))}
             </div>
+            <SeriesSupportBadge mint={s.mintAddress} />
             <ConcentrationCard mint={s.mintAddress} />
             <div className="border border-border bg-gradient-to-b from-foreground/[0.04] to-foreground/[0.01] p-6 flex flex-col gap-3">
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">On-Chain</span>
