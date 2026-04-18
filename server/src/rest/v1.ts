@@ -1,10 +1,31 @@
-import express, { type Router, type Request, type Response } from "express";
+import express, { type Router, type Request, type Response, type NextFunction } from "express";
 import rateLimit from "express-rate-limit";
 import cors from "cors";
 import { db } from "../db/index.js";
 import { appRouter } from "../routers/index.js";
 import { settlementOrders } from "../db/schema.js";
 import { desc, eq } from "drizzle-orm";
+import { resolveApiKey } from "../services/api-keys.js";
+import type { DinoTier } from "../services/dino-balance.js";
+
+/**
+ * Per-tier rate limits (req/min). Tier 0 is the anon / no-key path
+ * and keeps the previous 60/min bar. Higher tiers unlock proportional
+ * multipliers so real integrations have headroom without us having
+ * to negotiate paid plans per consumer.
+ */
+const TIER_LIMITS: Record<0 | 1 | 2 | 3, number> = {
+  0: 60,
+  1: 300,
+  2: 1200,
+  3: 3000,
+};
+
+interface TieredRequest extends Request {
+  apiTier?: DinoTier;
+  apiKeyId?: number;
+  apiKeyOwner?: string;
+}
 
 /**
  * Public unauthed REST gateway. Thin adapters over the existing tRPC
@@ -23,11 +44,58 @@ import { desc, eq } from "drizzle-orm";
  * OpenAPI 3.0 spec and a Scalar-rendered documentation UI.
  */
 
-const PUBLIC_RATE = rateLimit({ windowMs: 60_000, limit: 60 });
 const publicCors = cors({
   origin: "*",
   methods: ["GET", "HEAD", "OPTIONS"],
   optionsSuccessStatus: 204,
+});
+
+/**
+ * Authorization-header middleware. Runs before the rate limiter so
+ * the limiter can see the caller's tier. Tolerates missing /
+ * malformed / revoked keys by falling through to the anon path —
+ * the REST gateway is explicitly public-read, a bad key is just
+ * a missed-upgrade, not an error.
+ */
+async function attachTier(
+  req: TieredRequest,
+  _res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const auth = req.header("authorization");
+  if (!auth) return next();
+  const match = auth.match(/^Bearer\s+(dino_live_[A-Za-z0-9_-]+)$/);
+  if (!match) return next();
+  try {
+    const resolved = await resolveApiKey(match[1]);
+    if (resolved) {
+      req.apiTier = resolved.tier;
+      req.apiKeyId = resolved.key.id;
+      req.apiKeyOwner = resolved.key.ownerWallet;
+    }
+  } catch {
+    /* swallow; fall through to anon */
+  }
+  next();
+}
+
+/**
+ * Tier-aware limiter. Bucket key is the API key id when present, IP
+ * otherwise — so a single key with the Gold tier multiplier gets
+ * 3000 req/min across all of that integrator's consumers, while
+ * anonymous IPs still cap at 60/min each.
+ */
+const PUBLIC_RATE = rateLimit({
+  windowMs: 60_000,
+  limit: (req: TieredRequest) => {
+    const id = (req.apiTier?.id ?? 0) as 0 | 1 | 2 | 3;
+    return TIER_LIMITS[id];
+  },
+  keyGenerator: (req: TieredRequest) => {
+    return req.apiKeyId ? `key:${req.apiKeyId}` : `ip:${req.ip ?? "unknown"}`;
+  },
+  standardHeaders: true,
+  legacyHeaders: false,
 });
 
 function setCache(res: Response) {
@@ -64,6 +132,7 @@ async function wrap(
 export function mountRestV1(app: express.Express): Router {
   const r = express.Router();
   r.use(publicCors);
+  r.use(attachTier);
   r.use(PUBLIC_RATE);
 
   r.get("/series", async (req: Request, res: Response) => {
@@ -151,11 +220,12 @@ const OPENAPI_SPEC = {
   openapi: "3.0.3",
   info: {
     title: "DinoSecurities Public API",
-    version: "1.0.0",
+    version: "1.1.0",
     description:
-      "Unauthed read-only gateway into the DinoSecurities platform. Wraps the same indexed data the official UI and tRPC surface use. Rate-limited to 60 req/min/IP; cacheable 60s at the edge, 300s at the CDN.",
+      "Public read-only gateway into the DinoSecurities platform. Wraps the same indexed data the official UI and tRPC surface use.\n\n**Rate limits (req/min):** 60 anonymous, 300 Bronze, 1200 Silver, 3000 Gold — tier is resolved from the live $DINO balance of the wallet attached to your API key. Generate a key at `/app/dino`. Send it as `Authorization: Bearer dino_live_…`. Cacheable 60s at the edge, 300s at the CDN.",
   },
   servers: [{ url: "/api/v1", description: "Production" }],
+  security: [{}, { DinoKey: [] }],
   paths: {
     "/series": {
       get: {
@@ -290,6 +360,15 @@ const OPENAPI_SPEC = {
     },
   },
   components: {
+    securitySchemes: {
+      DinoKey: {
+        type: "http",
+        scheme: "bearer",
+        bearerFormat: "dino_live_*",
+        description:
+          "Optional. Present an API key to lift the default 60 req/min IP-based rate limit to your $DINO tier: Bronze 300/min, Silver 1200/min, Gold 3000/min. Tier is read live from the key owner's $DINO balance.",
+      },
+    },
     schemas: {
       Series: {
         type: "object",
